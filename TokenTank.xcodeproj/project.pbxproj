@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AAAAAAAAAAAAAAAAAAAA0080 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAA0081 /* Assets.xcassets */; };
 		AAAAAAAAAAAAAAAAAAAA0044 /* TokenTankWidgetUI in Frameworks */ = {isa = PBXBuildFile; productRef = AAAAAAAAAAAAAAAAAAAA0045 /* TokenTankWidgetUI */; };
 		AAAAAAAAAAAAAAAAAAAA0020 /* TokenTankKit in Frameworks */ = {isa = PBXBuildFile; productRef = AAAAAAAAAAAAAAAAAAAA0025 /* TokenTankKit */; };
 		AAAAAAAAAAAAAAAAAAAA0021 /* TokenTankKit in Frameworks */ = {isa = PBXBuildFile; productRef = AAAAAAAAAAAAAAAAAAAA0026 /* TokenTankKit */; };
@@ -58,6 +59,7 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileReference section */
+		AAAAAAAAAAAAAAAAAAAA0081 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = App/TokenTank/Resources/Assets.xcassets; sourceTree = SOURCE_ROOT; };
 		AAAAAAAAAAAAAAAAAAAA0070 /* TokenTankProbe */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = TokenTankProbe; sourceTree = BUILT_PRODUCTS_DIR; };
 		AAAAAAAAAAAAAAAAAAAA0050 /* VisualTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VisualTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AAAAAAAAAAAAAAAAAAAA0007 /* TokenTank.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TokenTank.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -152,6 +154,7 @@
 			children = (
 				AAAAAAAAAAAAAAAAAAAA0005 /* TokenTank */,
 				AAAAAAAAAAAAAAAAAAAA0006 /* TokenTankWidget */,
+				AAAAAAAAAAAAAAAAAAAA0081 /* Assets.xcassets */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -329,6 +332,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AAAAAAAAAAAAAAAAAAAA0080 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -556,6 +560,7 @@
 		AAAAAAAAAAAAAAAAAAAA0035 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/TokenTankWidget/TokenTankWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 3;
@@ -580,6 +585,7 @@
 		AAAAAAAAAAAAAAAAAAAA0036 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/TokenTankWidget/TokenTankWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 3;
