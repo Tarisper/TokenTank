@@ -1,0 +1,13 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "date": "2026-11-11",
+      "currency": "CNY",
+      "original_amount": "10.01",
+      "discount_amount": "0.00",
+      "gift_amount": "0.00",
+      "final_paid_amount": "10.01"
+    }
+  ]
+}

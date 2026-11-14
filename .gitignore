@@ -1,0 +1,31 @@
+.DS_Store
+xcuserdata/
+DerivedData/
+*.xcuserstate
+*.dmg
+.build/
+.swiftpm/
+build/
+*.xcresult
+*.log
+
+# Local agent and editor settings
+AGENTS.md
+.agents/
+.codex/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Local planning and design references
+/PLAN.md
+/mockup/
+
+Tests/VisualTests/Reference/

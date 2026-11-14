@@ -1,0 +1,15 @@
+{
+  "object": "token_plan",
+  "plan_code": "standard",
+  "period": {
+    "start_at": "2026-11-12 13:35:26",
+    "end_at": "2026-12-12 23:59:59"
+  },
+  "quota": {
+    "total_credits": 11000000000,
+    "used_credits": 2018653495,
+    "remaining_credits": 8981346505
+  },
+  "auto_renew": false,
+  "claw_enabled": false
+}

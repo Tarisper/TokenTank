@@ -1,0 +1,36 @@
+{
+  "data": [
+    {
+      "bucket_time": "2026-11-11T00:00:00+08:00",
+      "model_id": "kimi-k3.1-pro",
+      "project_id": "proj-1",
+      "key": "key-1",
+      "prompt_tokens": 1000,
+      "completion_tokens": 500,
+      "cached_tokens": 200,
+      "request_count": 3
+    },
+    {
+      "bucket_time": "2026-11-11T00:00:00+08:00",
+      "model_id": "kimi-k3.1-pro",
+      "project_id": "proj-2",
+      "key": "key-2",
+      "prompt_tokens": 300,
+      "completion_tokens": 100,
+      "cached_tokens": 0,
+      "request_count": 1
+    },
+    {
+      "bucket_time": "2026-11-12T00:00:00+08:00",
+      "model_id": "kimi-k3.1-pro",
+      "project_id": "proj-1",
+      "key": "key-1",
+      "prompt_tokens": 100,
+      "completion_tokens": 50,
+      "cached_tokens": 0,
+      "request_count": 1
+    }
+  ],
+  "has_more": false,
+  "next": null
+}

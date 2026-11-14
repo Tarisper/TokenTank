@@ -1,0 +1,15 @@
+{
+  "object": "balance",
+  "is_available": true,
+  "balance_infos": [
+    {
+      "currency": "CNY",
+      "cash_balance": "100.50",
+      "gift_balance": "20.00",
+      "frozen_balance": "0.00",
+      "credit_limit": "500.00",
+      "credit_available": "380.00",
+      "total_available": "500.50"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "is_available": false,
+  "extra_field": "ignored",
+  "balance_infos": [
+    {
+      "currency": "CNY",
+      "total_balance": 15.5,
+      "granted_balance": null,
+      "topped_up_balance": "5.50",
+      "unknown": 1
+    },
+    {
+      "total_balance": "1.00"
+    }
+  ]
+}

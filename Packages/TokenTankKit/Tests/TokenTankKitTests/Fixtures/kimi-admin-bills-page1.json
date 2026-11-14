@@ -1,0 +1,32 @@
+{
+  "data": [
+    {
+      "date": "2026-11-11",
+      "total_fee": 150000,
+      "recharge_fee": 100000,
+      "voucher_fee": 50000,
+      "model_details": [
+        {
+          "model_id": "kimi-k3.1-pro",
+          "token_type": "prompt",
+          "tokens": 1000,
+          "key": "key-1",
+          "total_fee": 90000,
+          "recharge_fee": 60000,
+          "voucher_fee": 30000
+        },
+        {
+          "model_id": "kimi-k3.1-pro",
+          "token_type": "completion",
+          "tokens": 500,
+          "key": "key-1",
+          "total_fee": 60000,
+          "recharge_fee": 40000,
+          "voucher_fee": 20000
+        }
+      ]
+    }
+  ],
+  "has_more": true,
+  "next": "cursor-2"
+}

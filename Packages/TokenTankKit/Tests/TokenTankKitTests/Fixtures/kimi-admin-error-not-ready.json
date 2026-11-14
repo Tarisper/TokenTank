@@ -1,0 +1,9 @@
+{
+  "error": {
+    "type": "invalid_request_error",
+    "code": "data_not_ready",
+    "message": "T day data is available from T+1 07:00 UTC+8",
+    "param": null,
+    "request_id": "req-1"
+  }
+}

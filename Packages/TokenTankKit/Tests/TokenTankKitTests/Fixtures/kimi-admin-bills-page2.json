@@ -1,0 +1,13 @@
+{
+  "data": [
+    {
+      "date": "2026-11-12",
+      "total_fee": 50000,
+      "recharge_fee": 50000,
+      "voucher_fee": 0,
+      "model_details": []
+    }
+  ],
+  "has_more": false,
+  "next": null
+}

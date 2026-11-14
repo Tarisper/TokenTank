@@ -1,0 +1,15 @@
+{
+  "object": "token_plan",
+  "plan_code": "pro",
+  "period": {
+    "start_at": "2026-10-01 00:00:00",
+    "end_at": "2026-10-31 00:00:00"
+  },
+  "quota": {
+    "total_credits": 4100000000,
+    "used_credits": 1000000,
+    "remaining_credits": 4099000000
+  },
+  "auto_renew": true,
+  "claw_enabled": false
+}

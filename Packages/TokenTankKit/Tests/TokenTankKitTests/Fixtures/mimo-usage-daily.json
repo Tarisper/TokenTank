@@ -1,0 +1,32 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "date": "2026-11-11",
+      "resource_type": "model",
+      "name": "mimo-v2.6-pro",
+      "masked_api_key": "sk-****abcd",
+      "currency": "CNY",
+      "consumed_amount": "0.012345",
+      "input_cache_hit_amount": "0.001000",
+      "input_cache_miss_amount": "0.003000",
+      "output_amount": "0.008345",
+      "total_tokens": 1000,
+      "input_cache_hit_tokens": 400,
+      "input_cache_miss_tokens": 300,
+      "output_tokens": 300,
+      "request_count": 2,
+      "audio_transcription_seconds": null,
+      "inference_type": "online"
+    },
+    {
+      "date": "2026-11-11",
+      "resource_type": "plugin",
+      "name": "web-search",
+      "masked_api_key": "sk-****abcd",
+      "currency": "CNY",
+      "consumed_amount": "0.000500",
+      "request_count": 1
+    }
+  ]
+}

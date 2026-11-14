@@ -1,0 +1,10 @@
+{
+  "tiers": [
+    { "id": "Tier0", "rpm": 3, "tpm": 500000, "tpd": 1500000 },
+    { "id": "Tier1", "rpm": 100, "tpm": 2000000, "tpd": null },
+    { "id": "Tier2", "rpm": 100, "tpm": 3000000, "tpd": null },
+    { "id": "Tier3", "rpm": 200, "tpm": 3000000, "tpd": null },
+    { "id": "Tier4", "rpm": 200, "tpm": 4000000, "tpd": null },
+    { "id": "Tier5", "rpm": 300, "tpm": 5000000, "tpd": null }
+  ]
+}
