@@ -26,20 +26,34 @@ public enum Forecast {
             .filter { $0.currency == currency }
             .sorted { $0.localDay < $1.localDay }
         guard series.count >= 2 else { return .notEnoughData }
-        let window = Array(series.suffix(windowDays))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: series[series.count - 1].timeZoneID) ?? TimeZone(secondsFromGMT: 0)!
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard
+            let lastDate = formatter.date(from: series[series.count - 1].localDay),
+            let firstDate = calendar.date(byAdding: .day, value: -(windowDays - 1), to: lastDate)
+        else {
+            return .notEnoughData
+        }
+        let window = series.compactMap { point -> (point: BalancePoint, date: Date)? in
+            guard let date = formatter.date(from: point.localDay), date >= firstDate, date <= lastDate else { return nil }
+            return (point, date)
+        }
         var deltas: [Decimal] = []
-        var previous = window[0].available
-        for point in window.dropFirst() {
-            let delta = previous - point.available
-            if delta >= 0 {
+        for (previous, current) in zip(window, window.dropFirst()) {
+            let delta = previous.point.available - current.point.available
+            if calendar.dateComponents([.day], from: previous.date, to: current.date).day == 1, delta >= 0 {
                 deltas.append(delta)
             }
-            previous = point.available
         }
         guard deltas.count >= minimumValidDays else { return .notEnoughData }
         let burn = deltas.reduce(Decimal(0), +) / Decimal(deltas.count)
         guard burn > 0 else { return .notEnoughData }
-        let current = window[window.count - 1].available
+        let current = series[series.count - 1].available
         let daysValue = (current / burn as NSDecimalNumber).doubleValue.rounded(.down)
         guard daysValue >= 0, daysValue < Double(Int.max) else { return .notEnoughData }
         return .days(Int(daysValue))

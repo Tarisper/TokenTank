@@ -194,6 +194,23 @@ public struct ModelUsage: Codable {
     public let tokens: Int?
     /// Model's consumed amount (post-discount); `role` is `.cash` (expenditure).
     public let cost: Money?
+    /// Fraction of the complete scope total, computed before selecting the top models.
+    public let share: Decimal?
+
+    /// Creates a daily or aggregated model usage value.
+    /// - Parameters:
+    ///   - model: Provider model identifier.
+    ///   - requests: Request count, when known.
+    ///   - tokens: Token count, when known.
+    ///   - cost: Reported expenditure, when known.
+    ///   - share: Fraction of the complete scope total; `nil` for daily records.
+    public init(model: String, requests: Int?, tokens: Int?, cost: Money?, share: Decimal? = nil) {
+        self.model = model
+        self.requests = requests
+        self.tokens = tokens
+        self.cost = cost
+        self.share = share
+    }
 }
 
 /// One point of the balance history (for «N days» and burn rate).

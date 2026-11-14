@@ -275,12 +275,13 @@ struct ViewStateTests {
         )
     }
 
-    private func usage(_ model: String, cost: Decimal?, tokens: Int?) -> ModelUsage {
+    private func usage(_ model: String, cost: Decimal?, tokens: Int?, share: Decimal? = nil) -> ModelUsage {
         ModelUsage(
             model: model,
             requests: 1,
             tokens: tokens,
-            cost: cost.map { Money(role: .cash, amount: $0, currency: "CNY") }
+            cost: cost.map { Money(role: .cash, amount: $0, currency: "CNY") },
+            share: share
         )
     }
 
@@ -358,7 +359,7 @@ struct ViewStateTests {
             account: account(),
             snapshot: snapshotWithUsage(
                 status: .ok,
-                usages: [usage("a", cost: 30, tokens: 1), usage("b", cost: 10, tokens: 1)],
+                usages: [usage("a", cost: 30, tokens: 1, share: 0.75), usage("b", cost: 10, tokens: 1, share: 0.25)],
                 updatedAt: now
             ),
             scope: .account,
@@ -558,5 +559,129 @@ struct ViewStateTests {
             locale: Locale(identifier: "en_US")
         )
         #expect(state.rows.first?.balanceText == "$0.00 · 32.8%")
+    }
+
+    @Test func realAdapterCredentialFailureBeatsUnsupportedSections() async throws {
+        let account = testAccount(provider: .deepseek)
+        let snapshot = try await DeepSeekAdapter(descriptor: account, keychain: InMemoryKeychain()).fetchAccount()
+        let state = ViewStateBuilder.small(account: account, snapshot: snapshot, now: snapshot.updatedAt, locale: Locale(identifier: "en_US"))
+        #expect(state.status == .error)
+        #expect(state.statusText?.contains("key") == true)
+        #expect(state.updatedAtText == nil)
+    }
+
+    @Test func usageSuccessDoesNotRefreshOldBalanceTime() {
+        let old = now.addingTimeInterval(-7200)
+        let snapshot = snapshot(updatedAt: now, balances: [Money(role: .available, amount: 100, currency: "CNY")], sections: [
+            SectionSnapshot(kind: .balance, slotID: "sk", status: .failed(.network(code: -1009)), lastSuccessAt: old, lastAttemptAt: now),
+            SectionSnapshot(kind: .usage, slotID: "sk", status: .ok, lastSuccessAt: now, lastAttemptAt: now),
+            SectionSnapshot(kind: .quotas, slotID: nil, status: .unsupported, lastSuccessAt: nil, lastAttemptAt: nil),
+        ])
+        let locale = Locale(identifier: "en_US")
+        let state = ViewStateBuilder.small(account: account(), snapshot: snapshot, now: now, locale: locale)
+        #expect(state.status == .error)
+        #expect(ViewStateBuilder.dataUpdatedAt(of: snapshot) == old)
+        #expect(state.updatedAtText?.contains(old.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(locale))) == true)
+    }
+
+    @Test func freshBalanceDoesNotHideStaleQuota() {
+        let old = now.addingTimeInterval(-7200)
+        let quota = Quota(id: "q", kind: .tokenPlan, unit: .credits, total: 100, used: 20, remaining: 80, period: nil, autoRenew: nil)
+        let snapshot = snapshot(updatedAt: now, balances: [Money(role: .available, amount: 100, currency: "CNY")], quotas: [quota], sections: [
+            SectionSnapshot(kind: .balance, slotID: "sk", status: .ok, lastSuccessAt: now, lastAttemptAt: now),
+            SectionSnapshot(kind: .quotas, slotID: "tp", status: .failed(.network(code: -1009)), lastSuccessAt: old, lastAttemptAt: now),
+        ])
+        let state = ViewStateBuilder.small(account: account(), snapshot: snapshot, now: now)
+        #expect(state.status == .stale)
+        #expect(ViewStateBuilder.dataUpdatedAt(of: snapshot) == old)
+    }
+
+    @Test func stalenessStartsAtTheTimelineBoundary() {
+        let snapshot = snapshot(updatedAt: now.addingTimeInterval(-ViewStateBuilder.staleness), balances: [Money(role: .available, amount: 100, currency: "CNY")])
+        #expect(ViewStateBuilder.small(account: account(), snapshot: snapshot, now: now).status == .stale)
+    }
+
+    @Test func primaryBalanceUpdatesMediumRowsWithoutChangingStoredData() {
+        let account = account()
+        let stored = snapshot(updatedAt: now.addingTimeInterval(-3600), balances: [Money(role: .available, amount: 100, currency: "CNY")])
+        let primary = PrimarySnapshot(scope: .account, fetchedAt: now, balances: [Money(role: .available, amount: 1, currency: "CNY")], quota: nil)
+        let display = AccountSnapshot(account: account, primaryResult: .success(primary), scope: .account, previous: stored, now: now)
+        let locale = Locale(identifier: "en_US")
+        let medium = ViewStateBuilder.medium(accounts: [account], snapshots: [account.id: display], now: now, locale: locale)
+        #expect(medium.rows.first?.balanceText == Decimal(1).formatted(.currency(code: "CNY").locale(locale)))
+        #expect(medium.rows.first?.status == .ok)
+        #expect(stored.balances?.first?.amount == 100)
+        #expect(display.sections.first { $0.kind == .balance }?.lastSuccessAt == now)
+    }
+
+    @Test func activeBalanceIsVisibleWhenTheAccountAlsoHasQuotas() {
+        let account = account()
+        let quota = Quota(id: "q", kind: .tokenPlan, unit: .credits, total: 100, used: 20, remaining: 80, period: nil, autoRenew: nil)
+        let stored = snapshot(updatedAt: now, balances: [Money(role: .available, amount: 100, currency: "CNY")], quotas: [quota])
+        let primary = PrimarySnapshot(scope: .account, fetchedAt: now, balances: [Money(role: .available, amount: 1, currency: "CNY")], quota: nil)
+        let display = AccountSnapshot(account: account, primaryResult: .success(primary), scope: .account, previous: stored, now: now)
+        let locale = Locale(identifier: "en_US")
+        let medium = ViewStateBuilder.medium(
+            accounts: [account], snapshots: [account.id: display], focusAccountID: account.id,
+            primaryScope: primary.scope, now: now, locale: locale
+        )
+        #expect(medium.focus == nil)
+        #expect(medium.rows.first?.balanceText.hasPrefix(Decimal(1).formatted(.currency(code: "CNY").locale(locale))) == true)
+    }
+
+    @Test func primaryQuotaUpdatesMediumFocusAndPreservesOtherQuotas() throws {
+        let account = account()
+        let old = now.addingTimeInterval(-3600)
+        let quota = Quota(id: "q", kind: .tokenPlan, unit: .credits, total: 100, used: 20, remaining: 80, period: nil, autoRenew: nil)
+        let other = Quota(id: "other", kind: .subscription, unit: .requests, total: 100, used: 10, remaining: 90, period: nil, autoRenew: nil)
+        let stored = snapshot(updatedAt: old, quotas: [quota, other], sections: [
+            SectionSnapshot(kind: .quotas, slotID: "tp", status: .ok, lastSuccessAt: old, lastAttemptAt: old),
+        ])
+        let updated = Quota(id: "q", kind: .tokenPlan, unit: .credits, total: 100, used: 90, remaining: 10, period: nil, autoRenew: nil)
+        let primary = PrimarySnapshot(scope: .quota("q"), fetchedAt: now, balances: nil, quota: updated)
+        let display = AccountSnapshot(account: account, primaryResult: .success(primary), scope: .account, previous: stored, now: now)
+        let medium = ViewStateBuilder.medium(accounts: [account], snapshots: [account.id: display], focusAccountID: account.id, now: now)
+        let focus = try #require(medium.focus)
+        #expect(focus.bars.map(\.fraction) == [0.9, 0.1])
+        #expect(display.quotas?.last == other)
+        #expect(stored.quotas?.first == quota)
+        #expect(ViewStateBuilder.dataUpdatedAt(of: display, kinds: [.quotas]) == old)
+    }
+
+    @Test func primaryCredentialFailureReachesMediumFocus() {
+        let account = testAccount(provider: .mimo, slots: [CredentialSlot(id: "tp", kind: .tokenPlan, keychainRef: "ref", baseURLOverride: nil)])
+        let quota = Quota(id: MiMoAdapter.quotaID, kind: .tokenPlan, unit: .credits, total: 100, used: 20, remaining: 80, period: nil, autoRenew: nil)
+        let stored = snapshot(updatedAt: now.addingTimeInterval(-60), quotas: [quota])
+        let display = AccountSnapshot(account: account, primaryResult: .failure(.invalidKey), scope: .account, previous: stored, now: now)
+        let medium = ViewStateBuilder.medium(accounts: [account], snapshots: [account.id: display], focusAccountID: account.id, now: now)
+        #expect(medium.focus?.status == .error)
+        #expect(medium.focus?.bars.first?.fraction == 0.2)
+        #expect(display.quotas == stored.quotas)
+    }
+
+    @Test(arguments: [true, false])
+    func topModelSharesIncludeModelsOutsideTheTopThree(monetary: Bool) throws {
+        let models = ["a", "b", "c", "d"].map { usage($0, cost: monetary ? 25 : nil, tokens: 100) }
+        let history = [DailyUsage(localDay: "2026-11-14", timeZoneID: "UTC", requests: nil, tokensIn: nil, tokensOut: nil, cost: nil, models: models)]
+        let top = TopModels.aggregate(history: history)
+        let saved = try JSONDecoder().decode([ModelUsage].self, from: JSONEncoder().encode(top))
+        let state = ViewStateBuilder.topModels(
+            account: account(), snapshot: snapshotWithUsage(status: .ok, usages: saved, updatedAt: now),
+            scope: .account, now: now, locale: Locale(identifier: "en_US")
+        )
+        #expect(state.rows.count == 3)
+        #expect(state.rows.map(\.valueText) == ["25%", "25%", "25%"])
+    }
+
+    @Test func legacyModelUsageDoesNotInventShares() throws {
+        let json = Data(#"{"model":"legacy","requests":1,"tokens":100,"cost":{"role":"cash","amount":25,"currency":"CNY"}}"#.utf8)
+        let legacy = try JSONDecoder().decode(ModelUsage.self, from: json)
+        #expect(legacy.share == nil)
+        let locale = Locale(identifier: "en_US")
+        let state = ViewStateBuilder.topModels(
+            account: account(), snapshot: snapshotWithUsage(status: .ok, usages: [legacy], updatedAt: now),
+            scope: .account, now: now, locale: locale
+        )
+        #expect(state.rows.first?.valueText == Decimal(25).formatted(.currency(code: "CNY").locale(locale)))
     }
 }

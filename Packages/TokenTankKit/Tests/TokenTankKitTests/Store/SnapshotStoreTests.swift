@@ -191,4 +191,28 @@ struct SnapshotStoreTests {
         #expect(file.accounts.count == 1)
         #expect(file.accounts.first?.balances?.first?.amount == 7)
     }
+
+    @Test func concurrentUpdatesAcrossStoreInstancesPreserveEveryAccount() throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let stores = [SnapshotStore(directory: directory), SnapshotStore(directory: directory)]
+        let snapshots = (0..<48).map { index in
+            makeSnapshot(accountID: UUID(), balances: [Money(role: .available, amount: Decimal(index), currency: "CNY")], sections: [])
+        }
+        DispatchQueue.concurrentPerform(iterations: snapshots.count) { index in
+            do {
+                try stores[index % stores.count].update(account: snapshots[index])
+            } catch {
+                Issue.record(error)
+            }
+        }
+        let file = try #require({
+            if case .file(let file) = stores[0].read() { return file }
+            return nil
+        }())
+        #expect(Set(file.accounts.map(\.accountID)) == Set(snapshots.map(\.accountID)))
+        for snapshot in snapshots {
+            #expect(file.accounts.first { $0.accountID == snapshot.accountID }?.balances == snapshot.balances)
+        }
+    }
 }

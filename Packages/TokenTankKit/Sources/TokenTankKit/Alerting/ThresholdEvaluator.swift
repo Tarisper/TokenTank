@@ -1,8 +1,8 @@
 import Foundation
 
 /// Evaluates all thresholds of one account against fetch results, independently
-/// per currency and per quota. Call on successful fetches only — last-good data
-/// of failed fetches is not re-evaluated (avoids false repeats). Editing a
+/// per currency and per quota. Only successful sections advance their monitors;
+/// last-good data of failed sections is not re-evaluated. Editing a
 /// threshold (`value`/`rearmFraction` are part of the monitor identity) starts
 /// a fresh monitor with an `armed` phase. Monitors of removed thresholds are dropped.
 public struct ThresholdEvaluator: Sendable {
@@ -37,8 +37,9 @@ public struct ThresholdEvaluator: Sendable {
     /// - Parameters:
     ///   - snapshot: Fresh account snapshot.
     ///   - thresholds: Account thresholds.
+    ///   - attemptedAfter: Earliest accepted attempt time; excludes cached successes after a failed write.
     /// - Returns: Triggers in threshold order; empty when nothing transitioned.
-    public mutating func update(snapshot: AccountSnapshot, thresholds: [Threshold]) -> [Trigger] {
+    public mutating func update(snapshot: AccountSnapshot, thresholds: [Threshold], attemptedAfter: Date? = nil) -> [Trigger] {
         var triggers: [Trigger] = []
         var active: [String: ThresholdMonitor] = [:]
         for threshold in thresholds {
@@ -47,7 +48,12 @@ public struct ThresholdEvaluator: Sendable {
                 threshold: threshold,
                 phase: restoredTriggered.contains(signature) ? .triggered : .armed
             )
-            if let value = currentValue(of: threshold, in: snapshot) {
+            let kind: SectionKind = threshold.currency != nil ? .balance : .quotas
+            let succeeded = snapshot.sections.contains { section in
+                section.kind == kind && section.status == .ok
+                    && (attemptedAfter.map { (section.lastAttemptAt ?? section.lastSuccessAt ?? .distantPast) >= $0 } ?? true)
+            }
+            if succeeded, let value = currentValue(of: threshold, in: snapshot) {
                 let event = monitor.update(value: value)
                 if event != .none {
                     triggers.append(Trigger(threshold: threshold, event: event, value: value))

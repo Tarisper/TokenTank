@@ -16,6 +16,7 @@ public enum SnapshotReadResult {
 /// Single-writer store of `snapshot.json` in the App Group container.
 /// Writes are atomic (temporary file + rename); reads tolerate corruption.
 public final class SnapshotStore {
+    private static let writeLock = NSRecursiveLock()
     private let directory: URL
     private let fileName = "snapshot.json"
 
@@ -52,10 +53,10 @@ public final class SnapshotStore {
     /// - Parameter file: Snapshot to persist.
     /// - Throws: File-system errors.
     public func write(_ file: SnapshotFile) throws {
+        Self.writeLock.lock()
+        defer { Self.writeLock.unlock() }
         let data = try JSONEncoder().encode(file)
-        let tmpURL = directory.appendingPathComponent(".\(fileName).\(UUID().uuidString).tmp")
-        try data.write(to: tmpURL)
-        rename(tmpURL.path, fileURL().path)
+        try data.write(to: fileURL(), options: .atomic)
     }
 
     /// Merges an account fetch result per the last-good policy and persists the file.
@@ -65,6 +66,8 @@ public final class SnapshotStore {
     /// - Parameter incoming: Fetch result for one account.
     /// - Throws: File-system errors.
     public func update(account incoming: AccountSnapshot) throws {
+        Self.writeLock.lock()
+        defer { Self.writeLock.unlock() }
         var accounts: [AccountSnapshot]
         switch read() {
         case .file(let file):

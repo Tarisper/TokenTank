@@ -299,10 +299,14 @@ struct AccountFormView: View {
                 slotChecks[slot.id] = .failed(String(localized: "form.override.invalid"))
                 return
             }
+            guard BaseURLPolicy.validate(url, provider: provider, region: provider == .kimi ? region : nil) != .customGateway || gatewayConfirmed else {
+                slotChecks[slot.id] = .failed(String(localized: "form.error.gateway"))
+                return
+            }
             baseURL = url
         }
         let credential = CredentialSlot(id: slot.id, kind: slot.kind, keychainRef: ref, baseURLOverride: baseURL)
-        switch await model.validateKey(key, slot: credential, account: draftDescriptor(slots: [])) {
+        switch await model.validateKey(key, slot: credential, account: draftDescriptor(slots: []), customGatewayConfirmed: gatewayConfirmed) {
         case .success:
             slotChecks[slot.id] = .valid
         case .failure(let error):

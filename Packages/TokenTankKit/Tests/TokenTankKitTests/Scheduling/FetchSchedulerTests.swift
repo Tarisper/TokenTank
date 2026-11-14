@@ -76,6 +76,33 @@ extension NetworkTests {
             #expect(second.values.allSatisfy { $0 == .skipped })
         }
 
+        @Test func concurrentRefreshesOfDifferentAccountsPreserveAllSnapshots() async throws {
+            stubRequests { _ in .init(status: 200, body: fixture("deepseek-balance")) }
+            defer { URLProtocolStub.handler = nil }
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent("ConcurrentRefreshTests-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let store = SnapshotStore(directory: directory)
+            let scheduler = FetchScheduler(refresher: AccountRefresher(
+                keychain: InMemoryKeychain(storage: ["ref-sk": "sk-test"]), store: store, http: stubbedHTTPClient()
+            ))
+            let accounts = (0..<30).map { _ in testAccount(provider: .deepseek) }
+            await withTaskGroup(of: RefreshOutcome.self) { group in
+                for account in accounts {
+                    group.addTask { await scheduler.refresh(account) }
+                }
+                for await outcome in group {
+                    #expect(outcome == .success)
+                }
+            }
+            let file = try #require({
+                if case .file(let file) = store.read() { return file }
+                return nil
+            }())
+            #expect(Set(file.accounts.map(\.accountID)) == Set(accounts.map(\.id)))
+            #expect(file.accounts.allSatisfy { $0.balanceHistory?.isEmpty == false })
+        }
+
         @Test func backoffSequenceGrowsExponentiallyAndResets() async throws {
             stubRequests { _ in .init(status: 500, body: Data()) }
             defer { URLProtocolStub.handler = nil }

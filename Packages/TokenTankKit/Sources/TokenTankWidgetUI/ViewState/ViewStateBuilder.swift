@@ -88,6 +88,17 @@ public enum ViewStateBuilder {
     /// Forecast ring scale (§3.5): up to 90 days is a full ring.
     public static let forecastScaleDays = 90.0
 
+    /// Finds the oldest successful update of the sections being displayed.
+    /// - Parameters:
+    ///   - snapshot: Stored or display-only account snapshot.
+    ///   - kinds: Sections used by the layout.
+    /// - Returns: Oldest success time, or `nil` when those sections never succeeded.
+    public static func dataUpdatedAt(of snapshot: AccountSnapshot, kinds: Set<SectionKind> = [.balance, .quotas]) -> Date? {
+        let sections = snapshot.sections.filter { kinds.contains($0.kind) && $0.status != .unsupported }
+        let dates = sections.compactMap { $0.lastSuccessAt ?? ($0.status == .ok ? snapshot.updatedAt : nil) }
+        return dates.min() ?? (sections.isEmpty ? snapshot.updatedAt : nil)
+    }
+
     /// Resolves the display currency: explicit setting or the first `.available`
     /// currency of the last response (§3.1).
     /// - Parameters:
@@ -156,7 +167,7 @@ public enum ViewStateBuilder {
                 locale: locale
             ),
             bars: quotaBars(quotas: snapshot?.quotas, locale: locale),
-            updatedAtText: snapshot.map { updatedAtText(for: $0.updatedAt, locale: locale) }
+            updatedAtText: snapshot.flatMap { dataUpdatedAt(of: $0) }.map { updatedAtText(for: $0, locale: locale) }
         )
     }
 
@@ -196,6 +207,7 @@ public enum ViewStateBuilder {
     ///   - snapshots: Snapshots by account id.
     ///   - focusAccountID: Account selected in the widget configuration; when it has
     ///     quota bars, the layout shows them instead of the account list.
+    ///   - primaryScope: Active request scope; a balance result uses rows so the fetched amount is visible.
     ///   - now: Current time (staleness check).
     ///   - locale: Formatting locale.
     /// - Returns: Layout parameters.
@@ -203,14 +215,15 @@ public enum ViewStateBuilder {
         accounts: [AccountDescriptor],
         snapshots: [UUID: AccountSnapshot],
         focusAccountID: UUID? = nil,
+        primaryScope: Scope? = nil,
         now: Date = Date(),
         locale: Locale = .current
     ) -> WidgetViewState.Medium {
-        if let focusAccountID, let account = accounts.first(where: { $0.id == focusAccountID }) {
+        if primaryScope != .account, let focusAccountID, let account = accounts.first(where: { $0.id == focusAccountID }) {
             let snapshot = snapshots[account.id]
             let bars = quotaBars(quotas: snapshot?.quotas, locale: locale, showsReset: true)
             if bars.isEmpty == false {
-                let (status, statusText) = resolveStatus(account: account, snapshot: snapshot, now: now, locale: locale)
+                let (status, statusText) = resolveStatus(account: account, snapshot: snapshot, now: now, locale: locale, kinds: [.quotas])
                 return WidgetViewState.Medium(
                     focus: WidgetViewState.Medium.Focus(
                         label: account.label,
@@ -220,7 +233,7 @@ public enum ViewStateBuilder {
                     ),
                     rows: [],
                     emptyText: nil,
-                    updatedAtText: snapshot.map { updatedAtText(for: $0.updatedAt, locale: locale) }
+                    updatedAtText: snapshot.flatMap { dataUpdatedAt(of: $0, kinds: [.quotas]) }.map { updatedAtText(for: $0, locale: locale) }
                 )
             }
         }
@@ -312,8 +325,9 @@ public enum ViewStateBuilder {
         guard let snapshot else {
             return WidgetViewState.TopModels(status: .empty, statusText: emptyText, titleText: titleText, rows: [], emptyText: emptyText)
         }
-        let stale = now.timeIntervalSince(snapshot.updatedAt) > staleness
-        let age = relativeFormatterText(from: snapshot.updatedAt, to: now, locale: locale)
+        let updatedAt = dataUpdatedAt(of: snapshot, kinds: [.usage]) ?? snapshot.updatedAt
+        let stale = now.timeIntervalSince(updatedAt) >= staleness
+        let age = relativeFormatterText(from: updatedAt, to: now, locale: locale)
         let staleText = String(localized: "widget.status.stale \(age)", bundle: .module, locale: locale)
 
         let status: StatusKind
@@ -386,19 +400,19 @@ public enum ViewStateBuilder {
                 return WidgetViewState.TopModels.Row(name: usage.model, valueText: tokenText(usage, locale: locale), fraction: nil)
             }
         }
-        // Shares without bars (REQ-TOP-4): money share when costs are uniform,
-        // token share otherwise (no currency conversion).
-        let currencies = Set(usages.compactMap { $0.cost?.currency })
-        let moneyShare = currencies.count == 1
-        let total = moneyShare
-            ? usages.compactMap { $0.cost?.amount }.reduce(Decimal(0), +)
-            : Decimal(usages.reduce(0) { $0 + ($1.tokens ?? 0) })
         return usages.map { usage in
-            let value = moneyShare ? (usage.cost?.amount ?? 0) : Decimal(usage.tokens ?? 0)
-            let share = total > 0 ? Double(truncating: (value / total) as NSDecimalNumber) : 0
+            let valueText: String
+            if let share = usage.share {
+                valueText = Double(truncating: share as NSDecimalNumber)
+                    .formatted(.percent.precision(.fractionLength(0)).locale(locale))
+            } else if let cost = usage.cost {
+                valueText = cost.amount.formatted(.currency(code: cost.currency).locale(locale))
+            } else {
+                valueText = tokenText(usage, locale: locale)
+            }
             return WidgetViewState.TopModels.Row(
                 name: usage.model,
-                valueText: share.formatted(.percent.precision(.fractionLength(0)).locale(locale)),
+                valueText: valueText,
                 fraction: nil
             )
         }
@@ -415,22 +429,24 @@ public enum ViewStateBuilder {
         return formatter.localizedString(for: from, relativeTo: to)
     }
 
-    private static func resolveStatus(account: AccountDescriptor, snapshot: AccountSnapshot?, now: Date, locale: Locale) -> (StatusKind, String?) {
+    private static func resolveStatus(account: AccountDescriptor, snapshot: AccountSnapshot?, now: Date, locale: Locale, kinds: Set<SectionKind> = [.balance, .quotas]) -> (StatusKind, String?) {
         guard let snapshot else {
             return (.empty, String(localized: "widget.empty", bundle: .module, locale: locale))
         }
-        let failures = snapshot.sections.compactMap { section -> ProviderError? in
+        let sections = snapshot.sections.filter { kinds.contains($0.kind) && $0.status != .unsupported }
+        let failures = sections.compactMap { section -> ProviderError? in
             if case .failed(let error) = section.status {
                 return error
             }
             return nil
         }
-        if failures.isEmpty == false, failures.count == snapshot.sections.count {
-            return (.error, String(localized: "widget.status.error \(ProviderErrorText.text(for: failures[0], locale: locale))", bundle: .module, locale: locale))
+        if let error = failures.first(where: { $0.isCredentialFailure }) ?? (failures.count == sections.count ? failures.first : nil) {
+            return (.error, String(localized: "widget.status.error \(ProviderErrorText.text(for: error, locale: locale))", bundle: .module, locale: locale))
         }
-        let stale = now.timeIntervalSince(snapshot.updatedAt) > staleness
+        let updatedAt = dataUpdatedAt(of: snapshot, kinds: kinds)
+        let stale = updatedAt.map { now.timeIntervalSince($0) >= staleness } ?? false
         let low = isLow(account: account, snapshot: snapshot)
-        let age = relativeFormatterText(from: snapshot.updatedAt, to: now, locale: locale)
+        let age = relativeFormatterText(from: updatedAt ?? snapshot.updatedAt, to: now, locale: locale)
         if stale, low {
             let staleText = String(localized: "widget.status.stale \(age)", bundle: .module, locale: locale)
             let lowText = String(localized: "widget.status.low", bundle: .module, locale: locale)

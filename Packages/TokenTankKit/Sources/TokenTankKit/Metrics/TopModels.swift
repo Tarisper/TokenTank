@@ -57,6 +57,11 @@ public enum TopModels {
                 return lhs.value.tokens > rhs.value.tokens
             }
         }
+        let currencies = Set(totals.values.compactMap { $0.currency })
+        let moneyShare = currencies.count == 1 && totals.values.allSatisfy { $0.cost != nil }
+        let scopeTotal = totals.values.reduce(Decimal(0)) {
+            $0 + (moneyShare ? ($1.cost ?? 0) : Decimal($1.tokens))
+        }
         return ranked.prefix(max(count, 0)).map { model, total in
             var cost: Money?
             if let amount = total.cost, let currency = total.currency {
@@ -66,7 +71,8 @@ public enum TopModels {
                 model: model,
                 requests: total.requests == 0 ? nil : total.requests,
                 tokens: total.tokens == 0 ? nil : total.tokens,
-                cost: cost
+                cost: cost,
+                share: scopeTotal > 0 ? (moneyShare ? (total.cost ?? 0) : Decimal(total.tokens)) / scopeTotal : nil
             )
         }
     }

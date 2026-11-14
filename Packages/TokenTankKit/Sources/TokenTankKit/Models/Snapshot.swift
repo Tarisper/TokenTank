@@ -59,6 +59,81 @@ public struct SnapshotFile: Codable {
 }
 
 extension AccountSnapshot {
+    /// Projects an active widget fetch over stored data without persisting it.
+    /// - Parameters:
+    ///   - account: Account whose primary section was requested.
+    ///   - primaryResult: Lightweight fetch result.
+    ///   - scope: Requested balance or quota scope; success uses the returned scope.
+    ///   - previous: Stored snapshot used for sections not fetched and failed requests.
+    ///   - now: Attempt time when the request failed.
+    public init(
+        account: AccountDescriptor,
+        primaryResult: Result<PrimarySnapshot, ProviderError>,
+        scope: Scope,
+        previous: AccountSnapshot?,
+        now: Date = Date()
+    ) {
+        var balances = previous?.balances
+        var quotas = previous?.quotas
+        var sections = previous?.sections ?? []
+        let kind: SectionKind
+        let status: FetchStatus
+        let attemptedAt: Date
+        switch primaryResult {
+        case .success(let primary):
+            attemptedAt = primary.fetchedAt
+            status = .ok
+            switch primary.scope {
+            case .account:
+                kind = .balance
+                balances = primary.balances
+            case .quota:
+                kind = .quotas
+                if let quota = primary.quota {
+                    var updated = quotas ?? []
+                    if let index = updated.firstIndex(where: { $0.id == quota.id }) {
+                        updated[index] = quota
+                    } else {
+                        updated.append(quota)
+                    }
+                    quotas = updated
+                }
+            }
+        case .failure(let error):
+            attemptedAt = now
+            status = .failed(error)
+            let quotaOnly = account.credentialSlots.contains { $0.kind == .apiKey } == false
+                && account.credentialSlots.contains { $0.kind == .coding || $0.kind == .tokenPlan }
+            kind = scope == .account && quotaOnly == false ? .balance : .quotas
+        }
+        let existing = sections.first { $0.kind == kind }
+        var lastSuccessAt = status == .ok ? attemptedAt : existing?.lastSuccessAt
+        if case .success(let primary) = primaryResult, let quota = primary.quota,
+           previous?.quotas?.contains(where: { $0.id != quota.id }) == true {
+            lastSuccessAt = existing?.lastSuccessAt ?? previous?.updatedAt
+        }
+        sections.removeAll { $0.kind == kind }
+        sections.append(SectionSnapshot(
+            kind: kind,
+            slotID: existing?.slotID,
+            status: status,
+            lastSuccessAt: lastSuccessAt,
+            lastAttemptAt: attemptedAt
+        ))
+        self.init(
+            accountID: account.id,
+            updatedAt: status == .ok ? max(previous?.updatedAt ?? attemptedAt, attemptedAt) : previous?.updatedAt ?? attemptedAt,
+            isAvailable: previous?.isAvailable,
+            balances: balances,
+            quotas: quotas,
+            usageHistory: previous?.usageHistory,
+            balanceHistory: previous?.balanceHistory,
+            limits: previous?.limits,
+            modelTopByScope: previous?.modelTopByScope,
+            sections: sections
+        )
+    }
+
     /// Merges an incoming fetch result into the receiver per the last-good policy:
     /// data of a section whose incoming status is not `.ok` is preserved, only the
     /// status record updates. `updatedAt` advances only when some section succeeded.

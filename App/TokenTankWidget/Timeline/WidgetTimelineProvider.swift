@@ -72,6 +72,7 @@ struct WidgetTimelineProvider: AppIntentTimelineProvider {
                 entries.append(makeEntry(selection: selection, primaryResult: primary, now: staleAt))
             }
         }
+        entries.sort { $0.date < $1.date }
         return Timeline(entries: entries, policy: .after(next))
     }
 
@@ -93,8 +94,21 @@ struct WidgetTimelineProvider: AppIntentTimelineProvider {
         now: Date
     ) -> WidgetEntry {
         let effectiveAccount = selection.account ?? placeholderAccount
+        var snapshots = selection.snapshots
+        var primaryScope: Scope?
         let resolved: (state: WidgetViewState.Small, activeFailed: Bool)
         if let primaryResult {
+            primaryScope = selection.scope
+            if case .success(let primary) = primaryResult {
+                primaryScope = primary.scope
+            }
+            snapshots[effectiveAccount.id] = AccountSnapshot(
+                account: effectiveAccount,
+                primaryResult: primaryResult,
+                scope: selection.scope,
+                previous: selection.snapshot,
+                now: now
+            )
             resolved = ViewStateBuilder.small(
                 account: effectiveAccount,
                 primaryResult: primaryResult,
@@ -112,8 +126,9 @@ struct WidgetTimelineProvider: AppIntentTimelineProvider {
             small: resolved.state,
             medium: ViewStateBuilder.medium(
                 accounts: selection.accounts,
-                snapshots: selection.snapshots,
+                snapshots: snapshots,
                 focusAccountID: selection.focusAccountID,
+                primaryScope: primaryScope,
                 now: now
             ),
             topModels: ViewStateBuilder.topModels(
@@ -122,7 +137,7 @@ struct WidgetTimelineProvider: AppIntentTimelineProvider {
                 scope: selection.scope,
                 now: now
             ),
-            dataUpdatedAt: selection.snapshot?.updatedAt,
+            dataUpdatedAt: snapshots[effectiveAccount.id].flatMap { ViewStateBuilder.dataUpdatedAt(of: $0) },
             activeFailed: resolved.activeFailed
         )
     }

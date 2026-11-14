@@ -93,14 +93,19 @@ public enum AdapterRegistry {
     ///   - slot: Credential slot being validated.
     ///   - provider: Provider identifier.
     ///   - region: Account region; required for `kimi`.
+    ///   - customGatewayConfirmed: Whether the user confirmed sending the key to a custom host.
     ///   - http: HTTP client.
     /// - Throws: `ProviderError` when the key is rejected or the endpoint fails.
-    public static func validateKey(_ key: String, slot: CredentialSlot, provider: ProviderID, region: Region?, http: HTTPClient) async throws {
+    public static func validateKey(_ key: String, slot: CredentialSlot, provider: ProviderID, region: Region?, customGatewayConfirmed: Bool = false, http: HTTPClient) async throws {
         guard key.isEmpty == false else {
             throw ProviderError.invalidKey
         }
         guard let url = validationURL(for: slot, provider: provider, region: region) else {
             throw ProviderError.regionMismatch
+        }
+        let verdict = slot.baseURLOverride == nil ? .allowed : BaseURLPolicy.validate(url, provider: provider, region: region)
+        guard verdict == .allowed || (verdict == .customGateway && customGatewayConfirmed) else {
+            throw ProviderError.unsupported
         }
         let response = try await http.get(url, headers: ["Authorization": "Bearer \(key)"], timeout: 10)
         if response.status < 200 || response.status > 299 {

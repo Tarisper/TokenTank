@@ -88,34 +88,37 @@ final class AppModel: ObservableObject {
 
     /// Manual refresh of one account (event — dedup applies unless forced).
     func refresh(_ account: AccountDescriptor, force: Bool = false) async {
+        let startedAt = Date()
         refreshing.insert(account.id)
         let outcome = await scheduler.refresh(account, force: force)
         refreshing.remove(account.id)
         reloadSnapshots()
-        apply(outcome: outcome, for: account.id)
+        apply(outcome: outcome, for: account.id, attemptedAfter: startedAt)
         schedulerHost.reloadWidgetsIfChanged()
     }
 
     /// Manual refresh of all accounts (event — dedup applies).
     func refreshAll() async {
+        let startedAt = Date()
         refreshing = Set(accounts.map(\.id))
         let outcomes = await scheduler.runCycle(accounts: accounts)
         refreshing = []
         reloadSnapshots()
         for (id, outcome) in outcomes {
-            apply(outcome: outcome, for: id)
+            apply(outcome: outcome, for: id, attemptedAfter: startedAt)
         }
         schedulerHost.reloadWidgetsIfChanged()
     }
 
     /// Validates a key via the provider's validation endpoint.
-    func validateKey(_ key: String, slot: CredentialSlot, account: AccountDescriptor) async -> Result<Void, ProviderError> {
+    func validateKey(_ key: String, slot: CredentialSlot, account: AccountDescriptor, customGatewayConfirmed: Bool) async -> Result<Void, ProviderError> {
         do {
             try await AdapterRegistry.validateKey(
                 key,
                 slot: slot,
                 provider: account.provider,
                 region: account.region,
+                customGatewayConfirmed: customGatewayConfirmed,
                 http: HTTPClient()
             )
             return .success(())
@@ -133,19 +136,19 @@ final class AppModel: ObservableObject {
     }
 
     private func pollCycle() async {
+        let startedAt = Date()
         let outcomes = await scheduler.runCycle(accounts: accounts, force: true)
         reloadSnapshots()
         for (id, outcome) in outcomes {
-            apply(outcome: outcome, for: id)
+            apply(outcome: outcome, for: id, attemptedAfter: startedAt)
         }
         schedulerHost.reloadWidgetsIfChanged()
     }
 
-    private func apply(outcome: RefreshOutcome, for accountID: UUID) {
+    private func apply(outcome: RefreshOutcome, for accountID: UUID, attemptedAfter: Date) {
         switch outcome {
         case .success:
             failedRefreshes.remove(accountID)
-            evaluateThresholds(accountID: accountID)
         case .skipped:
             break
         case .retryAt(let deadline):
@@ -153,6 +156,9 @@ final class AppModel: ObservableObject {
             schedulerHost.scheduleOneShot(at: deadline)
         case .failed:
             failedRefreshes.insert(accountID)
+        }
+        if outcome != .skipped {
+            evaluateThresholds(accountID: accountID, attemptedAfter: attemptedAfter)
         }
     }
 
@@ -164,8 +170,8 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Threshold hysteresis runs on successful fetches only (M5.1–2).
-    private func evaluateThresholds(accountID: UUID) {
+    /// The evaluator only advances thresholds of successfully fetched sections.
+    private func evaluateThresholds(accountID: UUID, attemptedAfter: Date) {
         guard
             let account = accounts.first(where: { $0.id == accountID }),
             let snapshot = snapshots[accountID]
@@ -174,7 +180,7 @@ final class AppModel: ObservableObject {
         }
         var evaluator = evaluators[accountID]
             ?? ThresholdEvaluator(triggered: thresholdState.triggered(for: accountID))
-        let triggers = evaluator.update(snapshot: snapshot, thresholds: account.thresholds)
+        let triggers = evaluator.update(snapshot: snapshot, thresholds: account.thresholds, attemptedAfter: attemptedAfter)
         evaluators[accountID] = evaluator
         thresholdState.setTriggered(evaluator.triggered, for: accountID)
         for trigger in triggers {

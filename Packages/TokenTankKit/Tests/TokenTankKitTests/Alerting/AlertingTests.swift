@@ -7,7 +7,7 @@ struct AlertingTests {
         try Threshold(currency: "CNY", unit: nil, quotaID: nil, value: value, rearmFraction: rearm)
     }
 
-    private func snapshot(balances: [Money] = [], quotas: [Quota] = []) -> AccountSnapshot {
+    private func snapshot(balances: [Money] = [], quotas: [Quota] = [], sections: [SectionSnapshot]? = nil) -> AccountSnapshot {
         AccountSnapshot(
             accountID: UUID(),
             updatedAt: Date(timeIntervalSince1970: 1_000),
@@ -18,7 +18,9 @@ struct AlertingTests {
             balanceHistory: nil,
             limits: nil,
             modelTopByScope: nil,
-            sections: []
+            sections: sections ?? [.balance, .quotas].map {
+                SectionSnapshot(kind: $0, slotID: nil, status: .ok, lastSuccessAt: nil, lastAttemptAt: nil)
+            }
         )
     }
 
@@ -102,5 +104,39 @@ struct AlertingTests {
         let triggers = evaluator.update(snapshot: snapshot(quotas: [quota]), thresholds: [threshold])
         #expect(triggers.map(\.event) == [.crossed])
         #expect(triggers.first?.value == 50)
+    }
+
+    @Test func partialFailuresOnlyAdvanceSuccessfulThresholds() throws {
+        var evaluator = ThresholdEvaluator()
+        let money = try moneyThreshold(100)
+        let quotaThreshold = try Threshold(currency: nil, unit: .credits, quotaID: "q1", value: 100, rearmFraction: 1.1)
+        let quota = Quota(id: "q1", kind: .tokenPlan, unit: .credits, total: 1000, used: 950, remaining: 50, period: nil, autoRenew: nil)
+        let first = snapshot(balances: [Money(role: .available, amount: 90, currency: "CNY")], quotas: [quota], sections: [
+            SectionSnapshot(kind: .balance, slotID: "sk", status: .ok, lastSuccessAt: nil, lastAttemptAt: nil),
+            SectionSnapshot(kind: .quotas, slotID: "tp", status: .failed(.invalidKey), lastSuccessAt: nil, lastAttemptAt: nil),
+            SectionSnapshot(kind: .usage, slotID: "sk", status: .failed(.server(status: 500)), lastSuccessAt: nil, lastAttemptAt: nil),
+        ])
+        let triggers = evaluator.update(snapshot: first, thresholds: [money, quotaThreshold])
+        #expect(triggers.map(\.threshold) == [money])
+        #expect(triggers.map(\.event) == [.crossed])
+        let second = snapshot(balances: [Money(role: .available, amount: 120, currency: "CNY")], quotas: [quota], sections: [
+            SectionSnapshot(kind: .balance, slotID: "sk", status: .failed(.network(code: -1009)), lastSuccessAt: nil, lastAttemptAt: nil),
+            SectionSnapshot(kind: .quotas, slotID: "tp", status: .ok, lastSuccessAt: nil, lastAttemptAt: nil),
+        ])
+        let next = evaluator.update(snapshot: second, thresholds: [money, quotaThreshold])
+        #expect(next.map(\.threshold) == [quotaThreshold])
+        #expect(next.map(\.event) == [.crossed])
+        #expect(evaluator.triggered.count == 2)
+    }
+
+    @Test func cachedSuccessAfterFailedPersistenceDoesNotTriggerAnAlert() throws {
+        var evaluator = ThresholdEvaluator()
+        let threshold = try moneyThreshold(100)
+        let snapshot = snapshot(balances: [Money(role: .available, amount: 90, currency: "CNY")], sections: [
+            SectionSnapshot(kind: .balance, slotID: "sk", status: .ok, lastSuccessAt: Date(timeIntervalSince1970: 1000), lastAttemptAt: Date(timeIntervalSince1970: 1000)),
+        ])
+        #expect(evaluator.update(snapshot: snapshot, thresholds: [threshold], attemptedAfter: Date(timeIntervalSince1970: 2000)).isEmpty)
+        #expect(evaluator.triggered.isEmpty)
+        #expect(evaluator.update(snapshot: snapshot, thresholds: [threshold], attemptedAfter: Date(timeIntervalSince1970: 500)).map(\.event) == [.crossed])
     }
 }

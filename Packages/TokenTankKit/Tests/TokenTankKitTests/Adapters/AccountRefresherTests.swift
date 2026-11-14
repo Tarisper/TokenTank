@@ -74,5 +74,36 @@ extension NetworkTests {
                 http: stubbedHTTPClient()
             )
         }
+
+        @Test(arguments: [KeyKind.coding, .tokenPlan])
+        func customGatewayRequiresConfirmation(kind: KeyKind) async throws {
+            stubRequests { _ in .init(status: 200, body: Data()) }
+            defer { URLProtocolStub.handler = nil }
+            let provider: ProviderID = kind == .coding ? .kimi : .mimo
+            let slot = CredentialSlot(id: "custom", kind: kind, keychainRef: "ref", baseURLOverride: URL(string: "https://gateway.example"))
+            await #expect(throws: ProviderError.unsupported) {
+                try await AdapterRegistry.validateKey("test-key", slot: slot, provider: provider, region: .cn, http: stubbedHTTPClient())
+            }
+            #expect(URLProtocolStub.requests.isEmpty)
+            try await AdapterRegistry.validateKey(
+                "test-key", slot: slot, provider: provider, region: .cn,
+                customGatewayConfirmed: true, http: stubbedHTTPClient()
+            )
+            #expect(URLProtocolStub.requests.count == 1)
+            #expect(URLProtocolStub.requests.first?.url?.host == "gateway.example")
+        }
+
+        @Test func confirmationDoesNotAllowInsecureGateway() async throws {
+            stubRequests { _ in .init(status: 200, body: Data()) }
+            defer { URLProtocolStub.handler = nil }
+            let slot = CredentialSlot(id: "tp", kind: .tokenPlan, keychainRef: "ref", baseURLOverride: URL(string: "http://gateway.example"))
+            await #expect(throws: ProviderError.unsupported) {
+                try await AdapterRegistry.validateKey(
+                    "test-key", slot: slot, provider: .mimo, region: nil,
+                    customGatewayConfirmed: true, http: stubbedHTTPClient()
+                )
+            }
+            #expect(URLProtocolStub.requests.isEmpty)
+        }
     }
 }
