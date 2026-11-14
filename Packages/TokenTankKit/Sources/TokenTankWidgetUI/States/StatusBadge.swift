@@ -42,24 +42,28 @@ public enum StatusKind {
 public struct StatusBadge: View {
     private let kind: StatusKind
     private let text: String?
+    private let showsText: Bool
 
     /// - Parameters:
     ///   - kind: Status state.
     ///   - text: Preformatted text label (mandatory for `low`/`error`/`stale`).
-    public init(kind: StatusKind, text: String?) {
+    ///   - showsText: Whether to show the label beside the symbol; accessibility keeps the full text.
+    public init(kind: StatusKind, text: String?, showsText: Bool = true) {
         self.kind = kind
         self.text = text
+        self.showsText = showsText
     }
 
     public var body: some View {
         HStack(spacing: 4) {
             Image(systemName: kind.symbolName)
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(kind.color)
-            if let text {
+            if showsText, let text {
                 Text(text)
                     .font(.caption2)
                     .foregroundStyle(.primary)
-                    .lineLimit(1)
+                    .lineLimit(2)
             }
         }
         .accessibilityElement(children: .ignore)

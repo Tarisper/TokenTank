@@ -58,12 +58,11 @@ enum RenderHarness {
     @MainActor
     static func render<V: View>(view: V, wallpaper: Wallpaper, colorScheme: ColorScheme, size: CGSize) -> Data {
         let content = view
-            .padding(8)
-            .frame(width: size.width - 16, height: size.height - 16)
+            .padding(16)
+            .frame(width: size.width, height: size.height)
             .background(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 20)
                     .fill(.regularMaterial)
-                    .frame(width: size.width, height: size.height)
             )
             .environment(\.colorScheme, colorScheme)
         let composed = ZStack {

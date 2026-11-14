@@ -27,7 +27,12 @@ public struct WidgetViewState {
         public let status: StatusKind
         public let statusText: String?
         public let label: String
-        public let balanceText: String?
+        /// Available amounts formatted separately, display currency first.
+        public let balanceTexts: [String]
+        /// Available amounts joined for inline presentations.
+        public var balanceText: String? {
+            balanceTexts.isEmpty ? nil : balanceTexts.joined(separator: " · ")
+        }
         public let display: Display
         /// Quota bars for the `bars` small layout.
         public let bars: [BarParams]
@@ -120,16 +125,17 @@ public enum ViewStateBuilder {
     ///   - locale: Formatting locale.
     /// - Returns: `"$0.17 · ¥15.48"`, or `nil` when no balance is known.
     public static func balanceText(of account: AccountDescriptor, snapshot: AccountSnapshot?, locale: Locale = .current) -> String? {
-        formattedBalance(
+        let amounts = formattedBalances(
             balances: snapshot?.balances,
             currency: displayCurrency(of: account, snapshot: snapshot),
             locale: locale
         )
+        return amounts.isEmpty ? nil : amounts.joined(separator: " · ")
     }
 
     /// Formats one amount per `.available` currency (first entry per currency wins)
     /// and moves `currency` to the front.
-    private static func formattedBalance(balances: [Money]?, currency: String?, locale: Locale) -> String? {
+    private static func formattedBalances(balances: [Money]?, currency: String?, locale: Locale) -> [String] {
         var ordered: [Money] = []
         for money in balances ?? [] where money.role == .available {
             guard ordered.contains(where: { $0.currency == money.currency }) == false else { continue }
@@ -138,12 +144,8 @@ public enum ViewStateBuilder {
         if let currency, let index = ordered.firstIndex(where: { $0.currency == currency }), index > 0 {
             ordered.insert(ordered.remove(at: index), at: 0)
         }
-        guard ordered.isEmpty == false else {
-            return nil
-        }
         return ordered
             .map { $0.amount.formatted(.currency(code: $0.currency).locale(locale)) }
-            .joined(separator: " · ")
     }
 
     /// Builds the small widget layout.
@@ -159,7 +161,7 @@ public enum ViewStateBuilder {
             status: status,
             statusText: statusText,
             label: account.label,
-            balanceText: balanceText(of: account, snapshot: snapshot, locale: locale),
+            balanceTexts: formattedBalances(balances: snapshot?.balances, currency: currency, locale: locale),
             display: resolveDisplay(
                 quotas: snapshot?.quotas,
                 history: snapshot?.balanceHistory,
@@ -189,7 +191,7 @@ public enum ViewStateBuilder {
             status: .ok,
             statusText: nil,
             label: account.label,
-            balanceText: formattedBalance(balances: primary.balances, currency: currency, locale: locale),
+            balanceTexts: formattedBalances(balances: primary.balances, currency: currency, locale: locale),
             display: resolveDisplay(
                 quotas: primary.quota.map { [$0] },
                 history: nil,
@@ -239,14 +241,19 @@ public enum ViewStateBuilder {
         }
         let rows = accounts.map { account -> WidgetViewState.Row in
             let snapshot = snapshots[account.id]
-            let (status, statusText) = resolveStatus(account: account, snapshot: snapshot, now: now, locale: locale)
             let balance = balanceText(of: account, snapshot: snapshot, locale: locale)
             let limits = limitsText(of: account, snapshot: snapshot, locale: locale)
+            let forecast = forecastPhrase(account: account, snapshot: snapshot, locale: locale)
+            var kinds: Set<SectionKind> = []
+            if balance != nil || forecast != nil { kinds.insert(.balance) }
+            if limits != nil { kinds.insert(.quotas) }
+            if kinds.isEmpty { kinds = [.balance, .quotas] }
+            let (status, statusText) = resolveStatus(account: account, snapshot: snapshot, now: now, locale: locale, kinds: kinds)
             let value = [balance, limits].compactMap { $0 }.joined(separator: " · ")
             return WidgetViewState.Row(
                 label: account.label,
                 balanceText: value.isEmpty ? "—" : value,
-                detailText: forecastPhrase(account: account, snapshot: snapshot, locale: locale),
+                detailText: forecast,
                 status: status,
                 statusText: statusText
             )
@@ -285,7 +292,7 @@ public enum ViewStateBuilder {
                 status: .error,
                 statusText: String(localized: "widget.status.error \(ProviderErrorText.text(for: error, locale: locale))", bundle: .module, locale: locale),
                 label: passive.label,
-                balanceText: passive.balanceText,
+                balanceTexts: passive.balanceTexts,
                 display: passive.display,
                 bars: passive.bars,
                 updatedAtText: passive.updatedAtText

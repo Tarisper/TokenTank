@@ -220,7 +220,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Добавьте учётку"
+            "value": "Добавьте учётную запись"
           }
         }
       }
@@ -305,6 +305,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "нет данных"
+          }
+        }
+      }
+    },
+    "widget.forecastUnavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forecast needs more history"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Для прогноза нужна история"
           }
         }
       }
@@ -501,6 +517,58 @@
         }
       }
     },
+    "widget.moreAccounts %lld": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "+%lld more"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "+%lld more"
+                }
+              }
+            }
+          }
+        },
+        "ru": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "ещё %lld"
+                }
+              },
+              "few": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "ещё %lld"
+                }
+              },
+              "many": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "ещё %lld"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "ещё %lld"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "widget.name.kimi": {
       "localizations": {
         "en": {
@@ -549,22 +617,6 @@
         }
       }
     },
-    "widget.name.small": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Account"
-          }
-        },
-        "ru": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Учётная запись"
-          }
-        }
-      }
-    },
     "widget.name.mimo": {
       "localizations": {
         "en": {
@@ -577,6 +629,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "MiMo"
+          }
+        }
+      }
+    },
+    "widget.name.small": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Учётная запись"
           }
         }
       }
@@ -666,13 +734,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "of quota"
+            "value": "used"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "квоты"
+            "value": "расход"
           }
         }
       }
@@ -833,6 +901,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "обновлено в %@"
+          }
+        }
+      }
+    },
+    "widget.used": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "used"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "использовано"
           }
         }
       }

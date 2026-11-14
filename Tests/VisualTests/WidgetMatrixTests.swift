@@ -74,12 +74,38 @@ enum RenderFixtures {
                     total: 1000,
                     used: 328,
                     remaining: 672,
-                    period: nil,
+                    period: Period(start: updatedAt, end: updatedAt.addingTimeInterval(30 * 86_400)),
                     autoRenew: true
                 )
             ],
             usageHistory: nil,
             balanceHistory: nil,
+            limits: nil,
+            modelTopByScope: nil,
+            sections: [SectionSnapshot(kind: .balance, slotID: "sk", status: .ok, lastSuccessAt: updatedAt, lastAttemptAt: updatedAt)]
+        )
+    }
+
+    /// Two currencies with optional forecast history for the small widget width regression.
+    static func multiCurrencySnapshot(updatedAt: Date, includeHistory: Bool) -> AccountSnapshot {
+        AccountSnapshot(
+            accountID: account().id,
+            updatedAt: updatedAt,
+            isAvailable: true,
+            balances: [
+                Money(role: .available, amount: Decimal(string: "0.17")!, currency: "USD"),
+                Money(role: .available, amount: Decimal(string: "4.09")!, currency: "CNY"),
+            ],
+            quotas: nil,
+            usageHistory: nil,
+            balanceHistory: includeHistory ? (0..<4).map {
+                BalancePoint(
+                    localDay: String(format: "2026-11-%02d", $0 + 1),
+                    timeZoneID: "UTC",
+                    available: Decimal(20 - $0) / 100,
+                    currency: "USD"
+                )
+            } : nil,
             limits: nil,
             modelTopByScope: nil,
             sections: [SectionSnapshot(kind: .balance, slotID: "sk", status: .ok, lastSuccessAt: updatedAt, lastAttemptAt: updatedAt)]
@@ -145,10 +171,23 @@ enum RenderFixtures {
         )
     }
 
-    static func topModelsState(locale: Locale) -> WidgetViewState.TopModels {
-        ViewStateBuilder.topModels(
-            account: account(),
-            snapshot: deepseekSnapshot(updatedAt: now),
+    static func topModelsState(locale: Locale, updatedAt: Date? = nil) -> WidgetViewState.TopModels {
+        let updatedAt = updatedAt ?? now
+        let snapshot = AccountSnapshot(
+            accountID: account(label: "MiMo").id,
+            updatedAt: updatedAt,
+            isAvailable: true,
+            balances: nil,
+            quotas: nil,
+            usageHistory: nil,
+            balanceHistory: nil,
+            limits: nil,
+            modelTopByScope: deepseekSnapshot(updatedAt: now).modelTopByScope,
+            sections: [SectionSnapshot(kind: .usage, slotID: "sk", status: .ok, lastSuccessAt: updatedAt, lastAttemptAt: updatedAt)]
+        )
+        return ViewStateBuilder.topModels(
+            account: account(label: "MiMo"),
+            snapshot: snapshot,
             scope: .account,
             now: now,
             locale: locale
@@ -196,6 +235,27 @@ struct WidgetMatrixTests {
                     colorScheme: scheme,
                     size: RenderFixtures.mediumSize
                 )
+            }
+        }
+    }
+
+    @Test func multiCurrencySmallLayouts() throws {
+        for (schemeName, scheme) in Self.schemes {
+            for includeHistory in [false, true] {
+                let state = RenderFixtures.smallState(
+                    snapshot: RenderFixtures.multiCurrencySnapshot(updatedAt: RenderFixtures.now, includeHistory: includeHistory),
+                    locale: Locale(identifier: "ru")
+                )
+                for (name, layout) in [("ring", SmallLayout.ring), ("bars", .bars), ("rows", .rows)] {
+                    try RenderHarness.verify(
+                        name: "small-multicurrency-\(name)-\(schemeName)-history-\(includeHistory)",
+                        view: SmallLayoutView(state: state, layout: layout, activeFailed: false)
+                            .environment(\.locale, Locale(identifier: "ru")),
+                        wallpaper: .white,
+                        colorScheme: scheme,
+                        size: RenderFixtures.smallSize
+                    )
+                }
             }
         }
     }
@@ -269,6 +329,22 @@ struct WidgetMatrixTests {
                     colorScheme: scheme,
                     size: RenderFixtures.mediumSize
                 )
+            }
+        }
+    }
+
+    @Test func topModelsSmallMatrix() throws {
+        for (schemeName, scheme) in Self.schemes {
+            for locale in [Locale(identifier: "en_US"), Locale(identifier: "ru")] {
+                for (status, updatedAt) in [("ok", RenderFixtures.now), ("stale", RenderFixtures.now.addingTimeInterval(-7200))] {
+                    try RenderHarness.verify(
+                        name: "topmodels-small-\(status)-\(schemeName)-\(locale.identifier)",
+                        view: TopModelsLayoutView(state: RenderFixtures.topModelsState(locale: locale, updatedAt: updatedAt)),
+                        wallpaper: .white,
+                        colorScheme: scheme,
+                        size: RenderFixtures.smallSize
+                    )
+                }
             }
         }
     }

@@ -82,7 +82,7 @@ struct ProviderWidgetTimelineProvider: TimelineProvider {
             layout: .ring,
             small: ViewStateBuilder.small(account: effective, snapshot: snapshot, now: now),
             medium: ViewStateBuilder.medium(
-                accounts: state.accounts,
+                accounts: account.map { [$0] } ?? [],
                 snapshots: state.snapshots,
                 focusAccountID: account?.id,
                 now: now

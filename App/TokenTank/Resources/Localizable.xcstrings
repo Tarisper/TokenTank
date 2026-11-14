@@ -49,6 +49,22 @@
         }
       }
     },
+    "form.budget.remove": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Budget"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить бюджет"
+          }
+        }
+      }
+    },
     "form.cancel": {
       "localizations": {
         "en": {
@@ -61,6 +77,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Отмена"
+          }
+        }
+      }
+    },
+    "form.connection.advanced": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection settings"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Параметры подключения"
+          }
+        }
+      }
+    },
+    "form.credentialsNote": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keys are stored in Keychain"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ключи хранятся в Связке ключей"
           }
         }
       }
@@ -86,13 +134,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Display currency"
+            "value": "Choose currency automatically"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Валюта отображения"
+            "value": "Выбирать валюту автоматически"
           }
         }
       }
@@ -118,13 +166,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Confirm the custom gateway or fix the URL"
+            "value": "Confirm the custom gateway or change the address."
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Подтвердите custom gateway или исправьте URL"
+            "value": "Подтвердите подключение через свой шлюз или измените адрес."
           }
         }
       }
@@ -246,13 +294,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Use custom gateway"
+            "value": "Allow this custom gateway"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Использовать custom gateway"
+            "value": "Разрешить подключение через свой шлюз"
           }
         }
       }
@@ -326,13 +374,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "New key value"
+            "value": "Secret key"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Новое значение ключа"
+            "value": "Секретный ключ"
           }
         }
       }
@@ -406,13 +454,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Base URL override"
+            "value": "API address"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Переопределение Base URL"
+            "value": "Адрес API"
           }
         }
       }
@@ -429,6 +477,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Недопустимый URL"
+          }
+        }
+      }
+    },
+    "form.override.placeholder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Provider default"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Адрес провайдера по умолчанию"
           }
         }
       }
@@ -561,6 +625,22 @@
         }
       }
     },
+    "form.subtitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection, alerts and spending budgets"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Подключение, уведомления и бюджеты расходов"
+          }
+        }
+      }
+    },
     "form.threshold.add": {
       "localizations": {
         "en": {
@@ -589,6 +669,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Валюта"
+          }
+        }
+      }
+    },
+    "form.threshold.description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get notified when a balance or remaining quota falls below your threshold."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Получайте уведомления, когда баланс или остаток квоты опускается ниже заданного порога."
           }
         }
       }
@@ -646,13 +742,29 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Re-arm ×"
+            "value": "Re-arm factor ×"
           }
         },
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Возврат ×"
+            "value": "Возврат уведомлений ×"
+          }
+        }
+      }
+    },
+    "form.threshold.remove": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Threshold"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Удалить порог"
           }
         }
       }
@@ -737,6 +849,38 @@
         }
       }
     },
+    "form.title.add": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Account"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Новая учётная запись"
+          }
+        }
+      }
+    },
+    "form.title.edit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account Settings"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Настройки учётной записи"
+          }
+        }
+      }
+    },
     "form.unit.credits": {
       "localizations": {
         "en": {
@@ -812,7 +956,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Добавить учётку…"
+            "value": "Добавить учётную запись…"
           }
         }
       }
@@ -860,7 +1004,7 @@
         "ru": {
           "stringUnit": {
             "state": "translated",
-            "value": "Нет учёток"
+            "value": "Нет учётных записей"
           }
         }
       }
@@ -1041,6 +1185,38 @@
         }
       }
     },
+    "settings.accountActions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Account actions"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Действия с учётной записью"
+          }
+        }
+      }
+    },
+    "settings.accounts": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accounts"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Учётные записи"
+          }
+        }
+      }
+    },
     "settings.add": {
       "localizations": {
         "en": {
@@ -1089,6 +1265,54 @@
         }
       }
     },
+    "settings.empty.description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect a provider to see balances and limits in the menu bar and widgets."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Подключите провайдера, чтобы видеть баланс и лимиты в меню и виджетах."
+          }
+        }
+      }
+    },
+    "settings.empty.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add your first account"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Добавьте первую учётную запись"
+          }
+        }
+      }
+    },
+    "settings.general": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "General"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Основные настройки"
+          }
+        }
+      }
+    },
     "settings.launchAtLogin": {
       "localizations": {
         "en": {
@@ -1101,6 +1325,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Запускать при входе"
+          }
+        }
+      }
+    },
+    "settings.refresh.description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep TokenTank running for automatic updates and notifications."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Для автоматического обновления и уведомлений TokenTank должен быть запущен."
           }
         }
       }
@@ -1133,6 +1373,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Обновлять раз в"
+          }
+        }
+      }
+    },
+    "settings.subtitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accounts and app preferences"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Учётные записи и параметры приложения"
+          }
+        }
+      }
+    },
+    "settings.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TokenTank"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TokenTank"
           }
         }
       }

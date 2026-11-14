@@ -24,23 +24,21 @@ public struct SmallLayoutView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(state.label)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Spacer()
-                StatusBadge(kind: state.status, text: state.statusText)
+        VStack(alignment: .leading, spacing: 0) {
+            WidgetHeading(title: Text(state.label), status: state.status, statusText: state.statusText)
+            if state.balanceTexts.isEmpty == false {
+                VStack(alignment: .leading, spacing: 1) {
+                    ForEach(Array(state.balanceTexts.enumerated()), id: \.offset) { _, balance in
+                        Text(balance)
+                            .font(.system(size: state.balanceTexts.count > 1 ? 18 : layout == .rows ? 26 : 22, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.65)
+                    }
+                }
+                .padding(.top, 5)
             }
-            if let balanceText = state.balanceText {
-                Text(balanceText)
-                    .font(.title3)
-                    .foregroundStyle(.primary)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
+            Spacer(minLength: 4)
             switch layout {
             case .ring:
                 displayView
@@ -49,78 +47,74 @@ public struct SmallLayoutView: View {
             case .rows:
                 rowsView
             }
-            Spacer(minLength: 0)
-            footer
+            Spacer(minLength: 2)
+            WidgetFooter(statusText: state.status == .empty ? nil : state.statusText, updatedAtText: state.updatedAtText, activeFailed: activeFailed)
         }
-        .padding(2)
     }
 
     @ViewBuilder
     private var displayView: some View {
         switch state.display {
         case .ring(let fraction, let centerText, let captionText):
-            Ring(centerText: centerText, captionText: captionText, fraction: fraction)
-                .frame(maxWidth: .infinity)
-                .frame(height: 64)
+            if state.balanceTexts.count > 1 {
+                HStack(spacing: 8) {
+                    Ring(centerText: centerText, captionText: "", fraction: fraction)
+                        .frame(width: 40, height: 40)
+                    Text(captionText)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+            } else {
+                Ring(centerText: centerText, captionText: captionText, fraction: fraction)
+                    .frame(height: state.statusText != nil ? 46 : state.balanceText == nil ? 76 : 58)
+                    .frame(maxWidth: .infinity)
+            }
         case .noData(let text):
-            Text(text)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if state.balanceText == nil {
+                WidgetEmptyState(symbol: "chart.bar", text: state.status == .empty ? state.statusText ?? text : text)
+            } else {
+                Text("widget.forecastUnavailable", bundle: .module)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
         }
     }
 
     private var barsView: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 6) {
             ForEach(Array(state.bars.enumerated()), id: \.offset) { _, bar in
                 Bar(
                     kind: bar.kind,
                     valueText: bar.valueText,
                     fraction: bar.fraction,
                     caption: bar.caption,
-                    resetText: bar.resetText
+                    resetText: bar.resetText,
+                    prominent: state.balanceText == nil && state.bars.count == 1
                 )
             }
             if state.bars.isEmpty {
-                Text(noDataText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                displayView
             }
-        }
-    }
-
-    private var rowsView: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(state.label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            if let balanceText = state.balanceText {
-                Text(balanceText)
-                    .font(.caption)
-                    .monospacedDigit()
-            }
-            StatusBadge(kind: state.status, text: state.statusText)
         }
     }
 
     @ViewBuilder
-    private var footer: some View {
-        HStack(spacing: 4) {
-            // A failed refresh replaces the mark: the footer is too narrow for both.
-            if activeFailed {
-                Text(LocalizedStringKey("widget.activeFailed"), bundle: .module)
-                    .font(.caption2)
-                    .foregroundStyle(Color("StatusError", bundle: .module))
-            } else if let updatedAtText = state.updatedAtText {
-                UpdateIndicator(text: updatedAtText)
+    private var rowsView: some View {
+        switch state.display {
+        case .ring(_, let centerText, let captionText):
+            VStack(alignment: .leading, spacing: 2) {
+                Text(centerText)
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                Text(captionText)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
             }
+        case .noData:
+            displayView
         }
-    }
-
-    private var noDataText: String {
-        if case .noData(let text) = state.display {
-            return text
-        }
-        return ""
     }
 }
 
@@ -133,7 +127,7 @@ public struct MediumLayoutView: View {
     /// - Parameters:
     ///   - state: Resolved medium layout parameters.
     ///   - activeFailed: Show «could not update» over last-good data.
-    ///   - compact: Bars put their reset hint under the track (small family).
+    ///   - compact: Stack reset hints and emphasize a single quota in the small family.
     public init(state: WidgetViewState.Medium, activeFailed: Bool, compact: Bool = false) {
         self.state = state
         self.activeFailed = activeFailed
@@ -141,76 +135,61 @@ public struct MediumLayoutView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
             if let focus = state.focus {
-                HStack {
-                    Text(focus.label)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    Spacer()
-                    StatusBadge(kind: focus.status, text: focus.statusText)
+                WidgetHeading(title: Text(focus.label), status: focus.status, statusText: focus.statusText)
+                VStack(spacing: compact ? 4 : 12) {
+                    ForEach(Array(focus.bars.enumerated()), id: \.offset) { _, bar in
+                        Bar(
+                            kind: bar.kind,
+                            valueText: bar.valueText,
+                            fraction: bar.fraction,
+                            caption: bar.caption,
+                            resetText: bar.resetText,
+                            resetBelow: compact,
+                            prominent: compact && focus.bars.count == 1
+                        )
+                    }
                 }
-                ForEach(Array(focus.bars.enumerated()), id: \.offset) { _, bar in
-                    Bar(
-                        kind: bar.kind,
-                        valueText: bar.valueText,
-                        fraction: bar.fraction,
-                        caption: bar.caption,
-                        resetText: bar.resetText,
-                        resetBelow: compact
-                    )
-                }
+                .padding(.top, compact ? 6 : 12)
+                Spacer(minLength: 4)
+                WidgetFooter(statusText: focus.statusText, updatedAtText: state.updatedAtText, activeFailed: activeFailed)
             } else if let emptyText = state.emptyText {
-                Text(emptyText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                WidgetHeading(title: Text("widget.name.medium", bundle: .module), status: nil, statusText: nil)
+                WidgetEmptyState(symbol: "person.2", text: emptyText)
             } else {
-                ForEach(Array(state.rows.enumerated()), id: \.offset) { _, row in
-                    AccountRowView(
-                        label: row.label,
-                        balanceText: row.balanceText,
-                        detailText: row.detailText,
-                        status: StatusBadge(kind: row.status, text: row.statusText)
-                    )
+                let visibleRows = Array(state.rows.prefix(activeFailed ? 2 : 3))
+                HStack {
+                    WidgetHeading(title: Text("widget.name.medium", bundle: .module), status: nil, statusText: nil)
+                    if state.rows.count > visibleRows.count {
+                        Text("widget.moreAccounts \(state.rows.count - visibleRows.count)", bundle: .module)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                    }
                 }
-            }
-            Spacer(minLength: 0)
-            HStack(spacing: 4) {
+                .padding(.bottom, 6)
+                VStack(spacing: 6) {
+                    ForEach(Array(visibleRows.enumerated()), id: \.offset) { _, row in
+                        AccountRowView(
+                            label: row.label,
+                            balanceText: row.balanceText,
+                            detailText: row.statusText ?? row.detailText,
+                            status: StatusBadge(kind: row.status, text: row.statusText, showsText: false)
+                        )
+                    }
+                }
+                .frame(maxHeight: .infinity, alignment: .center)
                 if activeFailed {
-                    Text(LocalizedStringKey("widget.activeFailed"), bundle: .module)
-                        .font(.caption2)
-                        .foregroundStyle(Color("StatusError", bundle: .module))
-                } else if let updatedAtText = state.updatedAtText {
-                    UpdateIndicator(text: updatedAtText)
+                    WidgetFooter(statusText: nil, updatedAtText: nil, activeFailed: true)
+                        .padding(.top, 4)
                 }
             }
         }
-        .padding(2)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
-/// Data-freshness mark: an icon and the update time, sized exactly like the
-/// caption text it replaced.
-private struct UpdateIndicator: View {
-    let text: String
-
-    var body: some View {
-        HStack(spacing: 2) {
-            Image(systemName: "arrow.clockwise")
-            Text(text)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-        }
-        .font(.caption2)
-        .foregroundStyle(.tertiary)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(text))
-    }
-}
-
-/// Top-models widget layout composition (rendering infrastructure, M3.9).
+/// Top-models widget layout composition.
 public struct TopModelsLayoutView: View {
     private let state: WidgetViewState.TopModels
 
@@ -220,27 +199,102 @@ public struct TopModelsLayoutView: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(state.titleText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Spacer()
-                StatusBadge(kind: state.status, text: state.statusText)
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            WidgetHeading(title: Text(state.titleText), status: state.status, statusText: state.statusText)
             if state.rows.isEmpty {
-                Text(state.emptyText ?? "")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                Spacer(minLength: 0)
+                WidgetEmptyState(symbol: "chart.bar", text: state.emptyText ?? state.statusText ?? "")
             } else {
-                ForEach(Array(state.rows.enumerated()), id: \.offset) { _, row in
-                    TopModelRowView(name: row.name, valueText: row.valueText, fraction: row.fraction)
+                VStack(alignment: .leading, spacing: state.statusText == nil ? 4 : 2) {
+                    ForEach(Array(state.rows.enumerated()), id: \.offset) { _, row in
+                        TopModelRowView(name: row.name, valueText: row.valueText, fraction: row.fraction, compact: state.statusText != nil)
+                    }
                 }
+                .padding(.top, 5)
                 Spacer(minLength: 0)
+                if let statusText = state.statusText {
+                    WidgetFooter(statusText: statusText, updatedAtText: nil, activeFailed: false)
+                        .padding(.top, 2)
+                }
             }
         }
-        .padding(2)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+/// Compact identity row shared by widget layouts.
+private struct WidgetHeading: View {
+    let title: Text
+    let status: StatusKind?
+    let statusText: String?
+
+    var body: some View {
+        HStack(spacing: 6) {
+            title
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Spacer(minLength: 0)
+            if let status {
+                StatusBadge(kind: status, text: statusText, showsText: false)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Status takes precedence over the quieter update timestamp.
+private struct WidgetFooter: View {
+    let statusText: String?
+    let updatedAtText: String?
+    let activeFailed: Bool
+
+    var body: some View {
+        Group {
+            if activeFailed {
+                Label {
+                    Text("widget.activeFailed", bundle: .module)
+                } icon: {
+                    Image(systemName: "arrow.clockwise.circle")
+                        .foregroundStyle(Color("StatusError", bundle: .module))
+                }
+                .foregroundStyle(.primary)
+            } else if let statusText {
+                Text(statusText)
+                    .foregroundStyle(.primary)
+            } else if let updatedAtText {
+                HStack(spacing: 3) {
+                    Image(systemName: "arrow.clockwise")
+                    Text(updatedAtText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                .foregroundStyle(.secondary)
+            }
+        }
+        .font(.system(size: 9))
+        .lineLimit(2)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Quiet placeholder that leaves room for the widget heading and status.
+private struct WidgetEmptyState: View {
+    let symbol: String
+    let text: String
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: symbol)
+                .font(.system(size: 22, weight: .light))
+                .accessibilityHidden(true)
+            Text(text)
+                .font(.system(size: 10))
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

@@ -87,6 +87,70 @@ struct ViewStateTests {
         #expect(text == "\(usd) · \(cny)")
     }
 
+    @Test func smallKeepsEachCurrencyAsASeparateFormattedAmount() {
+        let account = account(displayCurrency: "USD")
+        let balances = [
+            Money(role: .available, amount: 4.09, currency: "CNY"),
+            Money(role: .available, amount: 0.17, currency: "USD"),
+            Money(role: .cash, amount: 3, currency: "CNY"),
+        ]
+        let locale = Locale(identifier: "ru")
+        let expected = [
+            Decimal(string: "0.17")!.formatted(.currency(code: "USD").locale(locale)),
+            Decimal(string: "4.09")!.formatted(.currency(code: "CNY").locale(locale)),
+        ]
+        let stored = snapshot(updatedAt: now, balances: balances)
+        let passive = ViewStateBuilder.small(account: account, snapshot: stored, now: now, locale: locale)
+        let primary = PrimarySnapshot(scope: .account, fetchedAt: now, balances: balances, quota: nil)
+        let active = ViewStateBuilder.small(account: account, primary: primary, locale: locale)
+        let failed = ViewStateBuilder.small(account: account, primaryResult: .failure(.invalidKey), snapshot: stored, now: now, locale: locale)
+        #expect(passive.balanceTexts == expected)
+        #expect(active.balanceTexts == expected)
+        #expect(failed.state.balanceTexts == expected)
+        #expect(passive.balanceText == expected.joined(separator: " · "))
+    }
+
+    @Test func quotaOnlyRowUsesTheSameStatusAsTheFocusedQuotaWidget() {
+        let account = testAccount(provider: .kimi, region: .intl, slots: [
+            CredentialSlot(id: "coding", kind: .coding, keychainRef: "ref-coding", baseURLOverride: nil),
+        ])
+        let quota = Quota(id: KimiAdapter.codingMonthQuotaID, kind: .subscription, unit: .percent, total: 100, used: 78.7, remaining: 21.3, period: nil, autoRenew: nil)
+        let stored = snapshot(updatedAt: now, quotas: [quota], sections: [
+            SectionSnapshot(kind: .balance, slotID: "sk", status: .failed(.invalidKey), lastSuccessAt: nil, lastAttemptAt: now),
+            SectionSnapshot(kind: .quotas, slotID: "coding", status: .ok, lastSuccessAt: now, lastAttemptAt: now),
+        ])
+        let list = ViewStateBuilder.medium(accounts: [account], snapshots: [account.id: stored], now: now)
+        let focused = ViewStateBuilder.medium(accounts: [account], snapshots: [account.id: stored], focusAccountID: account.id, now: now)
+        #expect(list.rows.first?.status == .ok)
+        #expect(list.rows.first?.status == focused.focus?.status)
+        #expect(list.rows.first?.statusText == nil)
+        #expect(list.rows.first?.balanceText == ViewStateBuilder.limitsText(of: account, snapshot: stored))
+    }
+
+    @Test(arguments: [SectionKind.balance, .quotas])
+    func rowStillReportsCredentialFailuresOfDisplayedMetrics(failedKind: SectionKind) {
+        let account = account()
+        let quota = Quota(id: "q", kind: .tokenPlan, unit: .credits, total: 100, used: 20, remaining: 80, period: nil, autoRenew: nil)
+        let stored = snapshot(updatedAt: now, balances: [Money(role: .available, amount: 10, currency: "USD")], quotas: [quota], sections: [
+            SectionSnapshot(kind: .balance, slotID: "sk", status: failedKind == .balance ? .failed(.invalidKey) : .ok, lastSuccessAt: now, lastAttemptAt: now),
+            SectionSnapshot(kind: .quotas, slotID: "tp", status: failedKind == .quotas ? .failed(.invalidKey) : .ok, lastSuccessAt: now, lastAttemptAt: now),
+        ])
+        let list = ViewStateBuilder.medium(accounts: [account], snapshots: [account.id: stored], now: now)
+        #expect(list.rows.first?.status == .error)
+        #expect(list.rows.first?.statusText != nil)
+    }
+
+    @Test func rowWithoutDataStillReportsInvalidKey() {
+        let account = account()
+        let stored = snapshot(updatedAt: now, sections: [
+            SectionSnapshot(kind: .balance, slotID: "sk", status: .failed(.invalidKey), lastSuccessAt: nil, lastAttemptAt: now),
+            SectionSnapshot(kind: .quotas, slotID: nil, status: .unsupported, lastSuccessAt: nil, lastAttemptAt: nil),
+        ])
+        let list = ViewStateBuilder.medium(accounts: [account], snapshots: [account.id: stored], now: now)
+        #expect(list.rows.first?.status == .error)
+        #expect(list.rows.first?.balanceText == "—")
+    }
+
     @Test func priorityErrorWinsOverEverything() {
         let failed = SectionSnapshot(kind: .balance, slotID: nil, status: .failed(.network(code: -1)), lastSuccessAt: nil, lastAttemptAt: now)
         let snapshot = snapshot(updatedAt: now.addingTimeInterval(-7200), balances: [], sections: [failed])

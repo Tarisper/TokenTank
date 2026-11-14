@@ -9,7 +9,7 @@ public struct Ring: View {
 
     /// - Parameters:
     ///   - centerText: Preformatted number in the center.
-    ///   - captionText: Preformatted caption under the number.
+    ///   - captionText: Preformatted caption under the number; empty omits it.
     ///   - fraction: Gauge fraction 0…1; `nil` renders the ring track empty.
     public init(centerText: String, captionText: String, fraction: Double?) {
         self.centerText = centerText
@@ -20,26 +20,32 @@ public struct Ring: View {
     public var body: some View {
         ZStack {
             Circle()
-                .stroke(.primary.opacity(0.15), lineWidth: 6)
+                .stroke(.primary.opacity(0.1), lineWidth: 5)
             if let fraction {
                 Circle()
                     .trim(from: 0, to: min(max(fraction, 0), 1))
-                    .stroke(Color("AccentFill", bundle: .module), style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                    .stroke(Color("AccentFill", bundle: .module), style: StrokeStyle(lineWidth: 5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             }
-            VStack(spacing: 0) {
+            VStack(spacing: 1) {
                 Text(centerText)
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
                     .foregroundStyle(.primary)
                     .monospacedDigit()
-                Text(captionText)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                if captionText.isEmpty == false {
+                    Text(captionText)
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
             }
-            .padding(6)
+            .padding(captionText.isEmpty ? 3 : 8)
         }
+        .aspectRatio(1, contentMode: .fit)
+        .padding(3)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(captionText))
         .accessibilityValue(Text(centerText))

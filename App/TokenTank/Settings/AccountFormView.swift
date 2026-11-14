@@ -52,6 +52,8 @@ struct AccountFormView: View {
     @State private var keyInputs: [String: String] = [:]
     @State private var overrideInputs: [String: String] = [:]
     @State private var slotChecks: [String: SlotCheck] = [:]
+    @State private var checkingSlots: Set<String> = []
+    @State private var expandedConnections: Set<String>
     @State private var thresholds: [ThresholdRow]
     @State private var budgets: [BudgetRow]
     @State private var gatewayConfirmed = false
@@ -85,13 +87,20 @@ struct AccountFormView: View {
             overrides[slot.id] = slot.baseURLOverride?.absoluteString ?? ""
         }
         _overrideInputs = State(initialValue: overrides)
+        _expandedConnections = State(initialValue: Set(overrides.filter { $0.value.isEmpty == false }.keys))
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                Form {
-                Section("form.section.main") {
+            SettingsHeader(
+                title: existing == nil ? "form.title.add" : "form.title.edit",
+                subtitle: "form.subtitle",
+                symbol: existing == nil ? "person.crop.circle.badge.plus" : "person.crop.circle"
+            )
+            .padding(24)
+            Divider()
+            Form {
+                Section {
                     Picker("form.provider", selection: $provider) {
                         ForEach([ProviderID.deepseek, .kimi, .mimo], id: \.self) { provider in
                             Text(provider.displayName).tag(provider)
@@ -112,9 +121,12 @@ struct AccountFormView: View {
                     }
                     TextField("form.label", text: $label)
                     Toggle("form.displayCurrency", isOn: $displayCurrencyAuto)
+                        .toggleStyle(.switch)
                     if displayCurrencyAuto == false {
                         TextField("form.currencyCode", text: $displayCurrency)
                     }
+                } header: {
+                    Label("form.section.main", systemImage: "person.crop.rectangle")
                 }
 
                 ForEach(slotPlan, id: \.id) { slot in
@@ -123,49 +135,73 @@ struct AccountFormView: View {
                 if hasCustomGateway {
                     Section {
                         Toggle("form.gatewayConfirm", isOn: $gatewayConfirmed)
+                            .toggleStyle(.switch)
                     }
                 }
 
-                Section("form.section.thresholds") {
-                    ForEach($thresholds) { $row in
-                        thresholdEditor($row)
+                Section {
+                    ForEach($thresholds) { row in
+                        thresholdEditor(row)
                     }
-                    Button("form.threshold.add") {
+                    Button {
                         thresholds.append(ThresholdRow())
+                    } label: {
+                        Label("form.threshold.add", systemImage: "plus.circle")
                     }
+                    .buttonStyle(.borderless)
+                } header: {
+                    Label("form.section.thresholds", systemImage: "bell.badge")
+                } footer: {
+                    Text("form.threshold.description")
                 }
 
-                Section("form.section.budgets") {
-                    ForEach($budgets) { $row in
-                        HStack {
-                            TextField("form.budget.currency", text: $row.currency)
-                                .frame(width: 90)
-                            TextField("form.budget.amount", text: $row.amount)
-                        }
+                Section {
+                    ForEach($budgets) { row in
+                        budgetEditor(row)
                     }
-                    Button("form.budget.add") {
+                    Button {
                         budgets.append(BudgetRow())
+                    } label: {
+                        Label("form.budget.add", systemImage: "plus.circle")
                     }
+                    .buttonStyle(.borderless)
+                } header: {
+                    Label("form.section.budgets", systemImage: "chart.bar")
                 }
-
-                if let errorMessage {
-                    Text(errorMessage)
-                        .foregroundStyle(.red)
-                }
-                }
-                .formStyle(.grouped)
-                .padding(20)
             }
+            .formStyle(.grouped)
+            .textFieldStyle(.roundedBorder)
+            .scrollContentBackground(.hidden)
             Divider()
-            HStack {
+            footer
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .frame(width: 640, height: 700)
+    }
+
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let errorMessage {
+                Label(errorMessage, systemImage: "exclamationmark.circle.fill")
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 12) {
+                Label("form.credentialsNote", systemImage: "lock.shield")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 16)
                 Button("form.cancel") { dismiss() }
-                Spacer()
+                    .keyboardShortcut(.cancelAction)
                 Button("form.save") { save() }
+                    .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
             }
-            .padding(8)
         }
-        .frame(width: 560, height: 620)
+        .controlSize(.large)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
     }
 
     private var hasCustomGateway: Bool {
@@ -202,71 +238,143 @@ struct AccountFormView: View {
         let ref = keychainRef(slot.id)
         let stored = model.keychain.key(for: ref)
         Section {
-            if let stored, keyInputs[slot.id]?.isEmpty != false {
-                Text("form.key.current \(KeyMask.format(stored))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
             LabeledContent("form.key.new") {
                 SecureField("", text: keyBinding(slot.id), prompt: Text(stored != nil ? "••••••••" : ""))
-                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 320)
             }
-            LabeledContent("form.override") {
-                TextField("", text: overrideBinding(slot.id))
-                    .textFieldStyle(.roundedBorder)
+            if let stored, keyInputs[slot.id]?.isEmpty != false {
+                Text("form.key.current \(KeyMask.format(stored))")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
             }
-            HStack {
-                Button("form.key.check") {
-                    Task { await checkSlot(slot, ref: ref) }
+            HStack(spacing: 10) {
+                Button {
+                    Task {
+                        checkingSlots.insert(slot.id)
+                        defer { checkingSlots.remove(slot.id) }
+                        await checkSlot(slot, ref: ref)
+                    }
+                } label: {
+                    Label("form.key.check", systemImage: "checkmark.shield")
                 }
-                switch slotChecks[slot.id] {
-                case .valid:
-                    Text("form.key.valid").foregroundStyle(.green)
-                case .failed(let message):
-                    Text(message).foregroundStyle(.red)
-                case nil:
-                    EmptyView()
+                .disabled(checkingSlots.contains(slot.id))
+                if checkingSlots.contains(slot.id) {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    switch slotChecks[slot.id] {
+                    case .valid:
+                        Label("form.key.valid", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    case .failed(let message):
+                        Label(message, systemImage: "exclamationmark.circle.fill")
+                            .foregroundStyle(.red)
+                    case nil:
+                        EmptyView()
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .font(.callout)
+            DisclosureGroup("form.connection.advanced", isExpanded: Binding(
+                get: { expandedConnections.contains(slot.id) },
+                set: { expanded in
+                    if expanded {
+                        expandedConnections.insert(slot.id)
+                    } else {
+                        expandedConnections.remove(slot.id)
+                    }
+                }
+            )) {
+                LabeledContent("form.override") {
+                    TextField("", text: overrideBinding(slot.id), prompt: Text("form.override.placeholder"))
+                        .frame(maxWidth: 320)
                 }
             }
         } header: {
-            Text(slot.title)
+            Label(slot.title, systemImage: "key.horizontal")
         }
     }
 
-    @ViewBuilder
     private func thresholdEditor(_ row: Binding<ThresholdRow>) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Picker("form.threshold.target", selection: row.isQuota) {
-                Text("form.threshold.money").tag(false)
-                Text("form.threshold.quota").tag(true)
-            }
-            .pickerStyle(.segmented)
-            if row.wrappedValue.isQuota {
-                HStack {
-                    TextField("form.threshold.quotaID", text: row.quotaID)
-                    Picker("form.threshold.unit", selection: row.unit) {
-                        ForEach(QuotaUnit.allCases, id: \.self) { unit in
-                            Text(unitTitle(unit)).tag(unit)
-                        }
-                    }
-                }
-            } else {
-                TextField("form.threshold.currency", text: row.currency)
-                    .frame(width: 90)
-            }
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                TextField("form.threshold.value", text: row.value)
-                TextField("form.threshold.rearm", text: row.rearm)
-                    .frame(width: 80)
+                Picker("form.threshold.target", selection: row.isQuota) {
+                    Text("form.threshold.money").tag(false)
+                    Text("form.threshold.quota").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 220, alignment: .leading)
                 Spacer()
                 Button(role: .destructive) {
                     thresholds.removeAll { $0.id == row.wrappedValue.id }
                 } label: {
-                    Image(systemName: "minus.circle")
+                    Label("form.threshold.remove", systemImage: "trash")
+                        .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
+                .help("form.threshold.remove")
+            }
+            if row.wrappedValue.isQuota {
+                TextField("form.threshold.quotaID", text: row.quotaID)
+                Picker("form.threshold.unit", selection: row.unit) {
+                    ForEach(QuotaUnit.allCases, id: \.self) { unit in
+                        Text(unitTitle(unit)).tag(unit)
+                    }
+                }
+            } else {
+                TextField("form.threshold.currency", text: row.currency)
+            }
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("form.threshold.value")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField("form.threshold.value", text: row.value)
+                        .labelsHidden()
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("form.threshold.rearm")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    TextField("form.threshold.rearm", text: row.rearm)
+                        .labelsHidden()
+                }
+                .frame(width: 150)
             }
         }
+        .padding(.vertical, 6)
+    }
+
+    private func budgetEditor(_ row: Binding<BudgetRow>) -> some View {
+        HStack(alignment: .bottom, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("form.budget.currency")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("form.budget.currency", text: row.currency)
+                    .labelsHidden()
+            }
+            .frame(width: 120)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("form.budget.amount")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("form.budget.amount", text: row.amount)
+                    .labelsHidden()
+            }
+            Button(role: .destructive) {
+                budgets.removeAll { $0.id == row.wrappedValue.id }
+            } label: {
+                Label("form.budget.remove", systemImage: "trash")
+                    .labelStyle(.iconOnly)
+            }
+            .buttonStyle(.borderless)
+            .help("form.budget.remove")
+            .padding(.bottom, 4)
+        }
+        .padding(.vertical, 6)
     }
 
     private func keyBinding(_ slotID: String) -> Binding<String> {

@@ -25,6 +25,7 @@ public struct Bar: View {
     private let caption: String?
     private let resetText: String?
     private let resetBelow: Bool
+    private let prominent: Bool
 
     /// - Parameters:
     ///   - kind: Bar kind (drives the label when `caption` is absent).
@@ -33,13 +34,15 @@ public struct Bar: View {
     ///   - caption: Per-limit caption overriding the generic kind label.
     ///   - resetText: Preformatted reset hint.
     ///   - resetBelow: Render the reset hint under the track instead of in the label row.
+    ///   - prominent: Emphasize the value when this is the widget's only quota.
     public init(
         kind: BarKind,
         valueText: String,
         fraction: Double,
         caption: String? = nil,
         resetText: String? = nil,
-        resetBelow: Bool = false
+        resetBelow: Bool = false,
+        prominent: Bool = false
     ) {
         self.kind = kind
         self.valueText = valueText
@@ -47,48 +50,77 @@ public struct Bar: View {
         self.caption = caption
         self.resetText = resetText
         self.resetBelow = resetBelow
+        self.prominent = prominent
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
-                Group {
-                    if let caption {
-                        Text(caption)
-                    } else {
-                        Text(LocalizedStringKey(kind.labelKey), bundle: .module)
-                    }
+        VStack(alignment: .leading, spacing: prominent ? 5 : 3) {
+            if prominent {
+                HStack(spacing: 4) {
+                    captionView
+                        .font(.system(size: 10, weight: .medium))
+                    Spacer(minLength: 0)
+                    Text("widget.used", bundle: .module)
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
                 }
-                .foregroundStyle(.secondary)
-                if resetBelow == false, let resetText {
-                    Text(resetText)
-                        .foregroundStyle(.tertiary)
-                }
-                Spacer(minLength: 4)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
                 Text(valueText)
-                    .foregroundStyle(.primary)
+                    .font(.system(size: 30, weight: .semibold, design: .rounded))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            } else {
+                HStack(spacing: 5) {
+                    captionView
+                        .font(.system(size: 10, weight: .medium))
+                    if resetBelow == false, let resetText {
+                        Text(resetText)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 4)
+                    Text(valueText)
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.primary)
+                        .monospacedDigit()
+                        .layoutPriority(1)
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
             }
-            .font(.caption2)
-            .lineLimit(1)
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(.primary.opacity(0.15))
+                        .fill(.primary.opacity(0.1))
                     Capsule()
                         .fill(Color("BarFill", bundle: .module))
                         .frame(width: proxy.size.width * min(max(fraction, 0), 1))
                 }
             }
-            .frame(height: 6)
-            .accessibilityLabel(caption.map { Text($0) } ?? Text(LocalizedStringKey(kind.labelKey), bundle: .module))
-            .accessibilityValue(Text(valueText))
-            if resetBelow, let resetText {
+            .frame(height: prominent ? 5 : 4)
+            if resetBelow || prominent, let resetText {
                 Text(resetText)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
         }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(caption.map { Text($0) } ?? Text(LocalizedStringKey(kind.labelKey), bundle: .module))
+        .accessibilityValue(Text([valueText, resetText].compactMap { $0 }.joined(separator: ", ")))
+    }
+
+    private var captionView: some View {
+        Group {
+            if let caption {
+                Text(caption)
+            } else {
+                Text(LocalizedStringKey(kind.labelKey), bundle: .module)
+            }
+        }
+        .foregroundStyle(.secondary)
     }
 }

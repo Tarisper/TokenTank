@@ -18,6 +18,10 @@
 
 TokenTank keeps your available balance and remaining quotas close at hand, without opening each provider's dashboard. Monitor multiple accounts from the menu bar, add widgets to your desktop, and receive notifications when a balance or quota falls below a threshold you set.
 
+![TokenTank widgets in dark mode](docs/images/widgets-dark.png)
+
+*Widget previews with sample data.*
+
 ## Features
 
 - **Multiple providers and accounts:** DeepSeek, Kimi (China and international regions), and Xiaomi MiMo.

@@ -55,6 +55,7 @@ final class AppModel: ObservableObject {
             await self?.refreshAll()
         }
         schedulerHost.start()
+        schedulerHost.reloadWidgetsIfChanged()
         notifications.requestAuthorization()
     }
 
