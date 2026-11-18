@@ -69,7 +69,7 @@ final class AppModel: ObservableObject {
     }
 
     /// Persists the account settings (upsert by `id`) and refreshes it —
-    /// saving a key is an instant-refresh event (§2.1), dedup applies.
+    /// saving a key bypasses the dedup window.
     func save(_ account: AccountDescriptor) throws {
         try accountStore.save(account)
         accounts = accountStore.accounts()
@@ -95,20 +95,21 @@ final class AppModel: ObservableObject {
         refreshing.remove(account.id)
         reloadSnapshots()
         apply(outcome: outcome, for: account.id, attemptedAfter: startedAt)
-        schedulerHost.reloadWidgetsIfChanged()
+        schedulerHost.reloadWidgetsIfChanged(force: force)
     }
 
-    /// Manual refresh of all accounts (event — dedup applies).
-    func refreshAll() async {
+    /// Refreshes all accounts, bypassing dedup for an explicit user request.
+    /// - Parameter force: Bypass dedup and request an immediate widget reload.
+    func refreshAll(force: Bool = false) async {
         let startedAt = Date()
         refreshing = Set(accounts.map(\.id))
-        let outcomes = await scheduler.runCycle(accounts: accounts)
+        let outcomes = await scheduler.runCycle(accounts: accounts, force: force)
         refreshing = []
         reloadSnapshots()
         for (id, outcome) in outcomes {
             apply(outcome: outcome, for: id, attemptedAfter: startedAt)
         }
-        schedulerHost.reloadWidgetsIfChanged()
+        schedulerHost.reloadWidgetsIfChanged(force: force)
     }
 
     /// Validates a key via the provider's validation endpoint.

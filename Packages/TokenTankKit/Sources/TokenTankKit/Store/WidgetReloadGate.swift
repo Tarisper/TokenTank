@@ -2,6 +2,7 @@ import Foundation
 
 /// Change-gated widget reload policy (§2): reload only when the semantic
 /// content of the snapshot changed, at most once per `minimumInterval`.
+/// Explicit refreshes bypass both checks.
 /// Volatile fields (`updatedAt`, section attempt/success timestamps) do not
 /// count as content changes.
 public struct WidgetReloadGate: Sendable {
@@ -21,20 +22,21 @@ public struct WidgetReloadGate: Sendable {
     /// - Parameters:
     ///   - file: Current snapshot file.
     ///   - now: Current time.
+    ///   - force: Reload immediately, including timestamp-only updates.
     /// - Returns: `true` when widget timelines should be reloaded.
-    public mutating func shouldReload(file: SnapshotFile, now: Date) -> Bool {
+    public mutating func shouldReload(file: SnapshotFile, now: Date, force: Bool = false) -> Bool {
         let digest = Self.semanticDigest(of: file)
         if digest != lastDigest {
             lastDigest = digest
             pending = true
         }
-        guard pending else { return false }
-        if let lastReload, now.timeIntervalSince(lastReload) < minimumInterval {
-            return false
+        let intervalElapsed = lastReload.map { now.timeIntervalSince($0) >= minimumInterval } ?? true
+        let reload = force || (pending && intervalElapsed)
+        if reload {
+            pending = false
+            lastReload = now
         }
-        pending = false
-        lastReload = now
-        return true
+        return reload
     }
 
     /// Digest of the meaningful content: statuses and data, not timestamps.

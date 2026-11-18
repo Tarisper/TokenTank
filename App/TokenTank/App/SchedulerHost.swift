@@ -113,10 +113,11 @@ final class SchedulerHost {
     }
 
     /// Reloads widget timelines only when the semantic snapshot content changed,
-    /// at most once per 5 minutes (§2 — WidgetKit budget).
-    func reloadWidgetsIfChanged() {
+    /// at most once per 5 minutes, unless explicitly forced by the user.
+    /// - Parameter force: Bypass change detection and the reload interval.
+    func reloadWidgetsIfChanged(force: Bool = false) {
         guard case .file(let file) = store.read() else { return }
-        if reloadGate.shouldReload(file: file, now: Date()) {
+        if reloadGate.shouldReload(file: file, now: Date(), force: force) {
             WidgetCenter.shared.reloadAllTimelines()
         }
     }

@@ -74,6 +74,9 @@ extension NetworkTests {
             #expect(first.values.allSatisfy { $0 == .success })
             let second = await scheduler.runCycle(accounts: accounts)
             #expect(second.values.allSatisfy { $0 == .skipped })
+            let manual = await scheduler.runCycle(accounts: accounts, force: true)
+            #expect(manual.count == accounts.count)
+            #expect(manual.values.allSatisfy { $0 == .success })
         }
 
         @Test func concurrentRefreshesOfDifferentAccountsPreserveAllSnapshots() async throws {

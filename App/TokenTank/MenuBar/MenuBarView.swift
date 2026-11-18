@@ -25,7 +25,7 @@ struct MenuBarView: View {
             }
             Divider()
             Button("menu.refreshAll") {
-                Task { await model.refreshAll() }
+                Task { await model.refreshAll(force: true) }
             }
             .disabled(model.refreshing.isEmpty == false)
         }

@@ -45,4 +45,25 @@ struct WidgetReloadGateTests {
         #expect(gate.shouldReload(file: file(balance: 100), now: t0) == true)
         #expect(gate.shouldReload(file: file(balance: 80), now: t0.addingTimeInterval(600)) == true)
     }
+
+    @Test func explicitRefreshBypassesWindowAndTimestampFilter() {
+        var gate = WidgetReloadGate(minimumInterval: 300)
+        let t0 = Date(timeIntervalSince1970: 5_000)
+        #expect(gate.shouldReload(file: file(updatedAt: t0), now: t0) == true)
+        let refreshed = file(updatedAt: t0.addingTimeInterval(10))
+        #expect(gate.shouldReload(file: refreshed, now: t0.addingTimeInterval(10), force: true) == true)
+        #expect(gate.shouldReload(file: refreshed, now: t0.addingTimeInterval(400)) == false)
+    }
+
+    @Test func explicitRefreshConsumesPendingChangeAndResetsWindow() {
+        var gate = WidgetReloadGate(minimumInterval: 300)
+        let t0 = Date(timeIntervalSince1970: 5_000)
+        #expect(gate.shouldReload(file: file(balance: 100), now: t0) == true)
+        #expect(gate.shouldReload(file: file(balance: 90), now: t0.addingTimeInterval(10)) == false)
+        #expect(gate.shouldReload(file: file(balance: 90), now: t0.addingTimeInterval(20), force: true) == true)
+        #expect(gate.shouldReload(file: file(balance: 80), now: t0.addingTimeInterval(310)) == false)
+        #expect(gate.shouldReload(file: file(balance: 80), now: t0.addingTimeInterval(320)) == true)
+        #expect(gate.shouldReload(file: file(balance: 80), now: t0.addingTimeInterval(700)) == false)
+    }
+
 }
