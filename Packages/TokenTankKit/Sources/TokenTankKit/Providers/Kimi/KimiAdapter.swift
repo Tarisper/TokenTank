@@ -86,7 +86,7 @@ public struct KimiAdapter: BalanceProvider {
         let apiKeySlot = descriptor.credentialSlots.first(where: { $0.kind == .apiKey })
         if let apiKeySlot {
             do {
-                let balance = try await fetchBalance(timeout: 10)
+                let balance = try await fetchBalance(timeout: 30)
                 balances = balance.balances
                 limits = balance.headerLimits ?? tierTable?.rateLimits(for: descriptor.tier)
                 sections.append(SectionSnapshot(kind: .balance, slotID: apiKeySlot.id, status: .ok, lastSuccessAt: now, lastAttemptAt: now))
@@ -116,7 +116,7 @@ public struct KimiAdapter: BalanceProvider {
         let codingSlot = descriptor.credentialSlots.first(where: { $0.kind == .coding })
         if let codingSlot {
             do {
-                quotas = try await fetchCodingQuotas(timeout: 10)
+                quotas = try await fetchCodingQuotas(timeout: 30)
                 sections.append(SectionSnapshot(kind: .quotas, slotID: codingSlot.id, status: .ok, lastSuccessAt: now, lastAttemptAt: now))
             } catch let error as ProviderError {
                 sections.append(SectionSnapshot(kind: .quotas, slotID: codingSlot.id, status: .failed(error), lastSuccessAt: nil, lastAttemptAt: now))
@@ -452,7 +452,7 @@ public struct KimiAdapter: BalanceProvider {
             if let cursor {
                 pageQuery.append(URLQueryItem(name: "cursor", value: cursor))
             }
-            let response = try await http.get(url, headers: ["Authorization": "Bearer \(key)"], timeout: 10, query: pageQuery)
+            let response = try await http.get(url, headers: ["Authorization": "Bearer \(key)"], timeout: 30, query: pageQuery)
             guard (200...299).contains(response.status) else {
                 throw ProviderError.fromHTTP(status: response.status, body: response.data, retryAfter: response.retryAfter)
             }

@@ -68,12 +68,15 @@ public enum AdapterRegistry {
     ///   - descriptor: Account settings.
     ///   - keychain: Source of slot keys.
     ///   - http: HTTP client.
+    ///   - tierTable: Optional provider tier limits.
+    ///   - usageSince: Last successful usage fetch for incremental MiMo history updates.
     /// - Returns: Provider adapter; unresolvable combinations fail per-section inside it.
     public static func makeAdapter(
         descriptor: AccountDescriptor,
         keychain: KeychainClient,
         http: HTTPClient = HTTPClient(),
-        tierTable: TierTable? = nil
+        tierTable: TierTable? = nil,
+        usageSince: Date? = nil
     ) -> BalanceProvider {
         switch descriptor.provider {
         case .deepseek:
@@ -81,7 +84,7 @@ public enum AdapterRegistry {
         case .kimi:
             return KimiAdapter(descriptor: descriptor, keychain: keychain, http: http, tierTable: tierTable)
         case .mimo:
-            return MiMoAdapter(descriptor: descriptor, keychain: keychain, http: http)
+            return MiMoAdapter(descriptor: descriptor, keychain: keychain, http: http, usageSince: usageSince)
         }
     }
 

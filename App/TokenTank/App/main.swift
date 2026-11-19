@@ -41,6 +41,24 @@ if CommandLine.arguments.contains("--dump-snapshot") {
     print(String(data: data, encoding: .utf8) ?? "{}")
     exit(0)
 }
+if CommandLine.arguments.contains("--probe-refresh") {
+    let defaults = UserDefaults(suiteName: AppGroup.identifier) ?? .standard
+    let accounts = AccountStore(defaults: defaults).accounts()
+    let store = SnapshotStore(directory: AppGroup.containerURL() ?? FileManager.default.temporaryDirectory)
+    let refresher = AccountRefresher(keychain: SystemKeychain(), store: store)
+    for account in accounts {
+        print("== \(account.provider.rawValue)")
+        do {
+            let snapshot = try await refresher.refresh(account)
+            for section in snapshot.sections {
+                print("  \(section.kind.rawValue): \(section.status)")
+            }
+        } catch {
+            print("  refresh: \(error)")
+        }
+    }
+    exit(0)
+}
 if CommandLine.arguments.contains("--probe-accounts") {
     // Debug: reads slot keys from the app Keychain and prints ONLY HTTP status
     // codes of the primary endpoints (never the key, never the body).

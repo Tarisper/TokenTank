@@ -26,6 +26,59 @@ extension NetworkTests {
             #expect(file.accounts.first?.accountID == account.id)
         }
 
+        @Test func mimoRefreshOnlyRefetchesRecentDaysAfterSuccessAndRateLimit() async throws {
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("AccountRefresherTests-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            defer { URLProtocolStub.handler = nil }
+            let store = SnapshotStore(directory: directory)
+            let refresher = AccountRefresher(
+                keychain: InMemoryKeychain(storage: ["ref-sk": "sk-test"]),
+                store: store,
+                http: stubbedHTTPClient()
+            )
+            let account = testAccount(provider: .mimo)
+            let olderDay = DayKey.string(for: Date().addingTimeInterval(-7 * 86_400), timeZoneID: "UTC")
+            let olderUsage = Data(String(decoding: fixture("mimo-usage-daily"), as: UTF8.self)
+                .replacingOccurrences(of: "2026-11-11", with: olderDay).utf8)
+            stubRequests { request in
+                let body: Data
+                switch request.url?.lastPathComponent {
+                case "balance": body = fixture("mimo-balance")
+                case "daily" where request.url?.path.contains("/usage/") == true: body = olderUsage
+                default: body = fixture("mimo-list-empty")
+                }
+                return .init(status: 200, body: body)
+            }
+            let initial = try await refresher.refresh(account)
+            #expect(URLProtocolStub.requests.count == 7)
+
+            stubRequests { request in
+                request.url?.path.hasSuffix("/balance") == true
+                    ? .init(status: 200, body: fixture("mimo-balance"))
+                    : .init(status: 429, body: Data())
+            }
+            let limited = try await refresher.refresh(account)
+            #expect(limited.sections.first { $0.kind == .usage }?.status == .failed(.rateLimited(retryAfter: nil)))
+            #expect(URLProtocolStub.requests.count == 2)
+
+            stubRequests { request in
+                let body = request.url?.path.hasSuffix("/balance") == true
+                    ? fixture("mimo-balance") : fixture("mimo-list-empty")
+                return .init(status: 200, body: body)
+            }
+            let recovered = try await refresher.refresh(account)
+            #expect(recovered.sections.first { $0.kind == .usage }?.status == .ok)
+            #expect(recovered.usageHistory?.map(\.localDay) == [olderDay])
+            #expect(URLProtocolStub.requests.count == 3)
+            let expectedStart = DayKey.string(for: initial.updatedAt.addingTimeInterval(-86_400), timeZoneID: "UTC")
+            for request in URLProtocolStub.requests where request.url?.path.hasSuffix("/balance") == false {
+                let query = URLComponents(url: try #require(request.url), resolvingAgainstBaseURL: false)?.queryItems
+                #expect(query?.first { $0.name == "start_date" }?.value == expectedStart)
+            }
+        }
+
         @Test func validateKeyAcceptsSuccessfulModelsEndpoint() async throws {
             stubRequests { _ in .init(status: 200, body: Data(#"{"data": []}"#.utf8)) }
             defer { URLProtocolStub.handler = nil }

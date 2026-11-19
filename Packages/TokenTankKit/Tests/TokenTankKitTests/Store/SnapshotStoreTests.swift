@@ -172,6 +172,26 @@ struct SnapshotStoreTests {
         #expect(merged.sections.count == 2)
     }
 
+    @Test func mergeDropsErrorsFromReplacedSlotsAndPreservesOtherSections() {
+        let accountID = UUID()
+        let previous = makeSnapshot(accountID: accountID, sections: [
+            SectionSnapshot(kind: .balance, slotID: "sk", status: .failed(.invalidKey), lastSuccessAt: nil, lastAttemptAt: nil),
+            SectionSnapshot(kind: .usage, slotID: "admin", status: .failed(.invalidKey), lastSuccessAt: nil, lastAttemptAt: nil),
+            SectionSnapshot(kind: .quotas, slotID: nil, status: .unsupported, lastSuccessAt: nil, lastAttemptAt: nil),
+            SectionSnapshot(kind: .limits, slotID: nil, status: .ok, lastSuccessAt: nil, lastAttemptAt: nil),
+        ])
+        let incoming = makeSnapshot(accountID: accountID, sections: [
+            SectionSnapshot(kind: .balance, slotID: nil, status: .unsupported, lastSuccessAt: nil, lastAttemptAt: nil),
+            SectionSnapshot(kind: .usage, slotID: nil, status: .unsupported, lastSuccessAt: nil, lastAttemptAt: nil),
+            SectionSnapshot(kind: .quotas, slotID: "coding", status: .ok, lastSuccessAt: nil, lastAttemptAt: nil),
+        ])
+
+        let merged = previous.merging(incoming)
+        #expect(merged.sections.count == 4)
+        #expect(merged.sections.map(\.slotID) == [nil, nil, "coding", nil])
+        #expect(merged.sections.map(\.status) == [.unsupported, .unsupported, .ok, .ok])
+    }
+
     @Test func updateMergesByAccountID() throws {
         let store = SnapshotStore(directory: try makeDirectory())
         let accountID = UUID()

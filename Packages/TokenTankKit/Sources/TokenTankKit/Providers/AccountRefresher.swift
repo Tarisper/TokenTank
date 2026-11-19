@@ -31,9 +31,11 @@ public struct AccountRefresher {
             reason: "tokentank.fetch"
         )
         defer { ProcessInfo.processInfo.endActivity(activity) }
-        let adapter = AdapterRegistry.makeAdapter(descriptor: descriptor, keychain: keychain, http: http)
+        let previous = storedSnapshot(id: descriptor.id)
+        let usageSince = previous?.sections.first { $0.kind == .usage }?.lastSuccessAt
+        let adapter = AdapterRegistry.makeAdapter(descriptor: descriptor, keychain: keychain, http: http, usageSince: usageSince)
         let fetched = try await adapter.fetchAccount()
-        let snapshot = enrich(fetched, previous: storedSnapshot(id: descriptor.id), timeZoneID: AdapterRegistry.dayTimeZone(for: descriptor.provider))
+        let snapshot = enrich(fetched, previous: previous, timeZoneID: AdapterRegistry.dayTimeZone(for: descriptor.provider))
         try store.update(account: snapshot)
         return snapshot
     }

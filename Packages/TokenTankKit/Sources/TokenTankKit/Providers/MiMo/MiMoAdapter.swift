@@ -11,6 +11,7 @@ public struct MiMoAdapter: BalanceProvider {
     public let descriptor: AccountDescriptor
     private let keychain: KeychainClient
     private let http: HTTPClient
+    private let usageSince: Date?
 
     private static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -36,10 +37,12 @@ public struct MiMoAdapter: BalanceProvider {
     ///   - descriptor: Account settings.
     ///   - keychain: Source of slot keys.
     ///   - http: HTTP client.
-    public init(descriptor: AccountDescriptor, keychain: KeychainClient, http: HTTPClient = HTTPClient()) {
+    ///   - usageSince: Last successful usage fetch; the preceding day is refetched for billing updates.
+    public init(descriptor: AccountDescriptor, keychain: KeychainClient, http: HTTPClient = HTTPClient(), usageSince: Date? = nil) {
         self.descriptor = descriptor
         self.keychain = keychain
         self.http = http
+        self.usageSince = usageSince
     }
 
     public func fetchPrimary(scope: Scope) async -> Result<PrimarySnapshot, ProviderError> {
@@ -84,7 +87,7 @@ public struct MiMoAdapter: BalanceProvider {
         let tpSlot = descriptor.credentialSlots.first(where: { $0.kind == .tokenPlan })
         if let tpSlot {
             do {
-                let quota = try await fetchTokenPlan(timeout: 10)
+                let quota = try await fetchTokenPlan(timeout: 30)
                 quotas = [quota]
                 sections.append(SectionSnapshot(kind: .quotas, slotID: tpSlot.id, status: .ok, lastSuccessAt: now, lastAttemptAt: now))
             } catch let error as ProviderError {
@@ -97,21 +100,24 @@ public struct MiMoAdapter: BalanceProvider {
         let skSlot = descriptor.credentialSlots.first(where: { $0.kind == .apiKey })
         if let skSlot {
             do {
-                let balance = try await fetchBalance(timeout: 10)
+                let balance = try await fetchBalance(timeout: 30)
                 balances = balance.balances
                 isAvailable = balance.isAvailable
                 sections.append(SectionSnapshot(kind: .balance, slotID: skSlot.id, status: .ok, lastSuccessAt: now, lastAttemptAt: now))
             } catch let error as ProviderError {
                 sections.append(SectionSnapshot(kind: .balance, slotID: skSlot.id, status: .failed(error), lastSuccessAt: nil, lastAttemptAt: now))
             }
-            // Usage follows the retention window (§3.5), not the tp quota
-            // period: quota periods feed `.quota` aggregations only (M6).
+            // Refetch the preceding day for delayed billing; AccountRefresher
+            // merges the incremental result with the retained history.
             let usagePeriod = Period(
-                start: now.addingTimeInterval(-TimeInterval(UsageHistory.baseRetentionDays) * 86_400),
+                start: max(
+                    now.addingTimeInterval(-TimeInterval(UsageHistory.baseRetentionDays) * 86_400),
+                    min(usageSince ?? .distantPast, now).addingTimeInterval(-86_400)
+                ),
                 end: now
             )
             do {
-                usageHistory = try await fetchUsageHistory(period: usagePeriod, timeout: 10)
+                usageHistory = try await fetchUsageHistory(period: usagePeriod, timeout: 30)
                 sections.append(SectionSnapshot(kind: .usage, slotID: skSlot.id, status: .ok, lastSuccessAt: now, lastAttemptAt: now))
             } catch let error as ProviderError {
                 sections.append(SectionSnapshot(kind: .usage, slotID: skSlot.id, status: .failed(error), lastSuccessAt: nil, lastAttemptAt: now))

@@ -179,7 +179,7 @@ extension AccountSnapshot {
         }
         for existingSection in self.sections {
             let covered = incoming.sections.contains {
-                $0.kind == existingSection.kind && $0.slotID == existingSection.slotID
+                $0.kind == existingSection.kind
             }
             if covered == false {
                 sections.append(existingSection)
