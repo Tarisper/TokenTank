@@ -51,9 +51,14 @@ public struct HTTPClient {
                     acc[key] = value
                 }
             } ?? [:]
+            if http?.statusCode ?? 0 >= 400 {
+                let snippet = String(decoding: data.prefix(512), as: UTF8.self)
+                SanitizedLogger.log("http: GET \(url.path) -> \(http?.statusCode ?? 0); body: \(snippet)")
+            }
             result = (data, http?.statusCode ?? 0, retryAfter, responseHeaders)
         } catch {
             let code = (error as? URLError)?.code.rawValue ?? URLError.Code.unknown.rawValue
+            SanitizedLogger.log("http: GET \(url.path) failed: \(code)")
             throw ProviderError.network(code: code)
         }
         return result

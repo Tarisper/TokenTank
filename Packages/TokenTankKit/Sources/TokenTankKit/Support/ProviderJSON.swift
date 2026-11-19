@@ -10,7 +10,8 @@ func decodeProvider<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
     do {
         return try JSONDecoder().decode(type, from: data)
     } catch {
-        SanitizedLogger.log("decoding \(T.self) failed: \(error)")
+        let snippet = String(decoding: data.prefix(512), as: UTF8.self)
+        SanitizedLogger.log("decoding \(T.self) failed: \(error); body: \(snippet)")
         throw ProviderError.decoding
     }
 }
