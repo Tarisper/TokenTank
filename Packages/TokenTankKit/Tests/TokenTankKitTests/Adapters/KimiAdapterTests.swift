@@ -177,6 +177,24 @@ struct KimiAdapterTests {
         #expect(URLProtocolStub.requests.compactMap { $0.url?.absoluteString } == ["https://api.kimi.com/coding/v1/usages"])
     }
 
+    @Test func degenerateCodingUsagesFailClosed() async throws {
+        stubRequests { _ in
+            .init(status: 200, body: Data(#"{"usages":{"limit_5h":{"used_ratio":0},"limit_7d":{"used_ratio":0}}}"#.utf8))
+        }
+        defer { URLProtocolStub.handler = nil }
+        let adapter = KimiAdapter(
+            descriptor: codingAccount(),
+            keychain: InMemoryKeychain(storage: ["ref-coding": "sk-kimi-test"]),
+            http: stubbedHTTPClient()
+        )
+        let snapshot = try await adapter.fetchAccount()
+        guard case .failed(.decoding) = snapshot.sections.first(where: { $0.kind == .quotas })?.status else {
+            Issue.record("expected quotas .failed(.decoding)")
+            return
+        }
+        #expect(snapshot.quotas == nil)
+    }
+
     @Test func codingUsagesWithoutLimitsUseFiveHourWindow() async throws {
         stubRequests { _ in .init(status: 200, body: fixture("kimi-coding-usages-no-limits")) }
         defer { URLProtocolStub.handler = nil }

@@ -267,6 +267,12 @@ public struct KimiAdapter: BalanceProvider {
             throw ProviderError.fromHTTP(status: response.status, body: response.data, retryAfter: response.retryAfter)
         }
         let body = try decodeProvider(CodingUsages.self, from: response.data)
+        // Some edges answer with zero ratios and no reset time at all; such a
+        // payload must not overwrite the last good quotas with a fake 0 %.
+        guard body.usages?.limit5h?.resetTime != nil || body.usages?.limitMonthTotal != nil else {
+            SanitizedLogger.log("kimi: unusable coding usages: \(String(decoding: response.data.prefix(1024), as: UTF8.self))")
+            throw ProviderError.decoding
+        }
         var quotas: [Quota] = []
         if let usedRatio = body.usages?.limitMonthTotal?.usedRatio {
             quotas.append(Self.percentQuota(
