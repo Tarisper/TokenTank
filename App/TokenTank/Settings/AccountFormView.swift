@@ -314,7 +314,6 @@ struct AccountFormView: View {
                         .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
-                .help("form.threshold.remove")
             }
             if row.wrappedValue.isQuota {
                 TextField("form.threshold.quotaID", text: row.quotaID)
@@ -371,7 +370,6 @@ struct AccountFormView: View {
                     .labelStyle(.iconOnly)
             }
             .buttonStyle(.borderless)
-            .help("form.budget.remove")
             .padding(.bottom, 4)
         }
         .padding(.vertical, 6)

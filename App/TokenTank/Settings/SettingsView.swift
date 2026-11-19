@@ -66,7 +66,6 @@ struct SettingsView: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .help("settings.edit")
                             Menu {
                                 Button("settings.edit", systemImage: "pencil") {
                                     editing = account
