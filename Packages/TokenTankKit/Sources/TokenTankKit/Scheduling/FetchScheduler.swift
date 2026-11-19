@@ -98,12 +98,12 @@ public actor FetchScheduler {
         if force == false, let blockedUntil = state.blockedUntil, now < blockedUntil {
             return .skipped
         }
-        let outcome = await attempt(account, now: now, state: &state)
+        let outcome = await attempt(account, state: &state)
         states[account.id] = state
         return outcome
     }
 
-    private func attempt(_ account: AccountDescriptor, now: Date, state: inout AccountState) async -> RefreshOutcome {
+    private func attempt(_ account: AccountDescriptor, state: inout AccountState) async -> RefreshOutcome {
         let failure: (error: ProviderError, adminSource: Bool)
         do {
             let snapshot = try await refresher.refresh(account)
@@ -114,7 +114,7 @@ public actor FetchScheduler {
                 })?.status
             else {
                 state.attempt = 0
-                state.blockedUntil = now.addingTimeInterval(config.minimumInterval)
+                state.blockedUntil = clock.now.addingTimeInterval(config.minimumInterval)
                 state.backoffUntil = nil
                 return .success
             }
@@ -128,10 +128,13 @@ public actor FetchScheduler {
         } catch {
             failure = (.network(code: URLError.Code.unknown.rawValue), false)
         }
-        return resolve(failure: failure, now: now, state: &state)
+        return resolve(failure: failure, state: &state)
     }
 
-    private func resolve(failure: (error: ProviderError, adminSource: Bool), now: Date, state: inout AccountState) -> RefreshOutcome {
+    private func resolve(failure: (error: ProviderError, adminSource: Bool), state: inout AccountState) -> RefreshOutcome {
+        // Backoff is measured from the failure, not from the attempt start:
+        // a 30 s timeout would otherwise consume the whole retry delay.
+        let now = clock.now
         let outcome: RefreshOutcome
         switch failure.error {
         case .invalidKey, .regionMismatch, .decoding, .unsupported:

@@ -127,6 +127,19 @@ extension NetworkTests {
             #expect(outcome == .retryAt(clock.now.addingTimeInterval(30)))
         }
 
+        @Test func backoffIsMeasuredFromFailureNotAttemptStart() async throws {
+            let clock = TestClock()
+            stubRequests { _ in
+                // A slow request (e.g. a 30 s timeout) must not consume the backoff.
+                clock.advance(30)
+                return .init(status: 500, body: Data())
+            }
+            defer { URLProtocolStub.handler = nil }
+            let scheduler = makeScheduler(clock: clock)
+            let outcome = await scheduler.refresh(testAccount(provider: .deepseek))
+            #expect(outcome == .retryAt(clock.now.addingTimeInterval(30)))
+        }
+
         @Test func negativeRetryAfterFallsBackToBackoff() async throws {
             stubRequests { _ in .init(status: 429, body: Data(), headers: ["Retry-After": "-5"]) }
             defer { URLProtocolStub.handler = nil }

@@ -18,14 +18,12 @@ final class SchedulerHost {
     private var config: FetchScheduler.Config
     private let store: SnapshotStore
     private var poller: NSBackgroundActivityScheduler?
-    private var retryPoller: NSBackgroundActivityScheduler?
+    private var retryTask: Task<Void, Never>?
     private var pendingRetry: Date?
     private var networkMonitor: NWPathMonitor?
     private var wakeObserver: NSObjectProtocol?
     private var wasOnline = true
     private var reloadGate = WidgetReloadGate()
-
-    private static let retryTolerance: TimeInterval = 5
 
     /// - Parameters:
     ///   - config: Polling configuration (interval and jitter tolerance).
@@ -82,8 +80,9 @@ final class SchedulerHost {
         poller.schedule { [weak self] completion in
             Task { @MainActor in
                 await self?.onPoll?()
-                completion(.finished)
             }
+            // End the activity immediately: a stuck poll must not block future ticks.
+            completion(.finished)
         }
         self.poller = poller
     }
@@ -96,20 +95,14 @@ final class SchedulerHost {
             return
         }
         pendingRetry = deadline
-        retryPoller?.invalidate()
-        let retryPoller = NSBackgroundActivityScheduler(identifier: "com.tokentank.retry")
-        retryPoller.repeats = false
-        retryPoller.interval = max(deadline.timeIntervalSinceNow, 1)
-        retryPoller.tolerance = Self.retryTolerance
-        retryPoller.qualityOfService = .utility
-        retryPoller.schedule { [weak self] completion in
-            Task { @MainActor in
-                self?.pendingRetry = nil
-                await self?.onPoll?()
-                completion(.finished)
-            }
+        retryTask?.cancel()
+        retryTask = Task { @MainActor [weak self] in
+            let delay = max(deadline.timeIntervalSinceNow, 0)
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            guard Task.isCancelled == false, let self else { return }
+            self.pendingRetry = nil
+            await self.onPoll?()
         }
-        self.retryPoller = retryPoller
     }
 
     /// Reloads widget timelines only when the semantic snapshot content changed,
@@ -117,7 +110,9 @@ final class SchedulerHost {
     /// - Parameter force: Bypass change detection and the reload interval.
     func reloadWidgetsIfChanged(force: Bool = false) {
         guard case .file(let file) = store.read() else { return }
-        if reloadGate.shouldReload(file: file, now: Date(), force: force) {
+        guard reloadGate.shouldReload(file: file, now: Date(), force: force) else { return }
+        // WidgetKit's synchronous XPC can stall; keep it off the main thread.
+        DispatchQueue.global(qos: .utility).async {
             WidgetCenter.shared.reloadAllTimelines()
         }
     }
