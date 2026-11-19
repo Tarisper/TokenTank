@@ -177,6 +177,23 @@ struct KimiAdapterTests {
         #expect(URLProtocolStub.requests.compactMap { $0.url?.absoluteString } == ["https://api.kimi.com/coding/v1/usages"])
     }
 
+    @Test func codingUsagesWithoutLimitsUseFiveHourWindow() async throws {
+        stubRequests { _ in .init(status: 200, body: fixture("kimi-coding-usages-no-limits")) }
+        defer { URLProtocolStub.handler = nil }
+        let adapter = KimiAdapter(
+            descriptor: codingAccount(),
+            keychain: InMemoryKeychain(storage: ["ref-coding": "sk-kimi-test"]),
+            http: stubbedHTTPClient()
+        )
+        let snapshot = try await adapter.fetchAccount()
+        #expect(snapshot.quotas?.map(\.id) == [KimiAdapter.codingMonthQuotaID, KimiAdapter.codingQuotaID])
+        #expect(snapshot.sections.first(where: { $0.kind == .quotas })?.status == .ok)
+        let fiveHour = try #require(snapshot.quotas?.last)
+        let reset = try Date("2026-11-19T15:00:00Z", strategy: .iso8601)
+        #expect(fiveHour.period?.end == reset)
+        #expect(fiveHour.period?.start == reset.addingTimeInterval(-5 * 3600))
+    }
+
     @Test func codingQuotaServesAccountAndQuotaScopes() async throws {
         stubRequests { _ in .init(status: 200, body: fixture("kimi-coding-usages")) }
         defer { URLProtocolStub.handler = nil }

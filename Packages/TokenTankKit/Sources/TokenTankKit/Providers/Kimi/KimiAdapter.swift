@@ -246,7 +246,8 @@ public struct KimiAdapter: BalanceProvider {
                 }
             }
 
-            let limits: [LimitEntry]
+            /// Present in the old response shape only; new plans omit it.
+            let limits: [LimitEntry]?
             let usages: Usages?
         }
 
@@ -277,15 +278,14 @@ public struct KimiAdapter: BalanceProvider {
         }
         if let usedRatio = body.usages?.limit5h?.usedRatio {
             let reset = body.usages?.limit5h?.resetTime.flatMap { try? Date($0, strategy: .iso8601) }
-            let period = reset.flatMap { end -> Period? in
-                guard
-                    let window = body.limits.first?.window,
-                    window.timeUnit == "TIME_UNIT_MINUTE",
-                    let minutes = window.duration
-                else {
-                    return nil
-                }
-                return Period(start: end.addingTimeInterval(-Double(minutes) * 60), end: end)
+            let period = reset.map { end -> Period in
+                let minutes = body.limits?.first?.window.flatMap { window -> Double? in
+                    guard window.timeUnit == "TIME_UNIT_MINUTE", let duration = window.duration else {
+                        return nil
+                    }
+                    return Double(duration)
+                } ?? 300
+                return Period(start: end.addingTimeInterval(-minutes * 60), end: end)
             }
             quotas.append(Self.percentQuota(id: Self.codingQuotaID, usedRatio: usedRatio, resetsAt: nil, period: period))
         }
